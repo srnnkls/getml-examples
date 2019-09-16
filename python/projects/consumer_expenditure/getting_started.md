@@ -9,7 +9,7 @@ description = ""
 This short blog post gets you started with **getML**. You will learn
 the basic steps and commands to tackle your data science project using
 its Python API. The underlying Python script can be accessed
-[here](/there/).
+[here](consumer_expenditure.py).
 
 # Motivation / Problem
 
@@ -32,9 +32,9 @@ a product is bought as a gift or not.
 
 ## Install getML
 
-But first of all you have to install **getML**. Just go to our
-[download page](/download-page/), choose the track that fits you most,
-and unpack the tarball we provide. That's it.
+But first of all you have to install **getML**. Just go to our [web
+page](https://get.ml), browse to the download page, choose the track
+that fits you most, and unpack the tarball we provide. That's it.
 
 ## Run getML
 
@@ -72,11 +72,11 @@ python3 setup.py install
 Finally, we need some data to work with. You have two
 options here.
 
-1. Get our cleaned and preprocessed [version](/link/data/) to start
+1. Get our cleaned and preprocessed [version](/data/consumer_expenditures) to start
 right away (assumed in the remainder of the post).
 2. Download the [original
 dataset](https://www.bls.gov/cex/pumd_data.htm) (diary15) and perform
-the preprocessing yourself using [this](/link/scripts/) cleaning
+the preprocessing yourself using [this](/data/consumer_expenditures/raw/convert_CE_data.py) cleaning
 script.
 
 # Staging the data
@@ -131,7 +131,7 @@ TIME_STAMPS = [
 We will also assign units to indicate which columns should be
 compared and to fine-tune their handling. More information about this
 subject can be found in the [long read](/link/long/) and the [API
-documentation](/pai/doc/).
+documentation](https://docs.get.ml).
 
 ```python
 units = dict()
@@ -264,7 +264,7 @@ predictor = predictors.XGBoostClassifier(
 
 Finally, we have all pieces together to construct the overall
 model. For details about its arguments, please have a look into the
-[documentation](/getml/python/api/). Like a `DataFrame` a model needs
+[documentation](https://docs.get.ml). Like a `DataFrame` a model needs
 to be uploaded to the **getML engine** using the `.send()` method too.
 
 ```python
