@@ -1,7 +1,6 @@
 Consumer expenditure public-use microdata (CE) provided by the [U.S. Bureau of Labor
 Statistics](https://www.bls.gov/cex/pumd_data.htm).
 
----
 
 Present in this folder are both the converted data sets `CE_*` used in
 the [getting started

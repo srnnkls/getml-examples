@@ -5,7 +5,7 @@ snippets and complete projects which will help you to get started with
 **getML**.
 
 A simple introduction to the Python API can be found in the [getting
-started](python/getting_started/getting_started.ipynb) guide as well
+started](python/projects/getting_started/getting_started.ipynb) guide as well
 as in the [code snippets](python/snippets/) highlighting and
 explaining different core aspects of the API. A more thorough guide to
 the analysis of real-world problems can be found in [consumer
