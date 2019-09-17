@@ -8,12 +8,6 @@ import pandas as pd
 import getml.engine as engine
 
 # -----------------------------------------------------------------------------
-# Set up folders - you need to insert folders on your computer
-
-# The folder that contains expd151.csv
-RAW_DATA_FOLDER = os.getenv("HOME") + "/Downloads/diary15"
-
-# -----------------------------------------------------------------------------
 
 engine.set_project("CE")
 
@@ -24,13 +18,12 @@ begin = time.time()
 
 # -----------------------------------------------------------------------------
 # Read the data from the source files
+source_path = os.path.join(os.getcwd(), "../../../data/consumer_expenditures/raw/")
 
-os.chdir(RAW_DATA_FOLDER)
-
-expd = pd.read_csv("expd151.csv")
-expd = expd.append(pd.read_csv("expd152.csv"))
-expd = expd.append(pd.read_csv("expd153.csv"))
-expd = expd.append(pd.read_csv("expd154.csv"))
+expd = pd.read_csv(os.path.join(source_path, "expd151.csv"))
+expd = expd.append(pd.read_csv(os.path.join(source_path, "expd152.csv")))
+expd = expd.append(pd.read_csv(os.path.join(source_path, "expd153.csv")))
+expd = expd.append(pd.read_csv(os.path.join(source_path, "expd154.csv")))
 
 # -----------------------------------------------------------------------------
 # Set up target - we want to predict whether the item is a gift

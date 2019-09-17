@@ -16,12 +16,6 @@ database.connect_sqlite3(
 )
 
 # -----------------------------------------------------------------------------
-# Set up folders - you need to insert folders on your computer
-
-# The folder that contains expd151.csv
-RAW_DATA_FOLDER = os.getenv("HOME") + "/Downloads/diary15/"
-
-# -----------------------------------------------------------------------------
 
 engine.set_project("CE")
 
@@ -33,12 +27,13 @@ begin = time.time()
 # -----------------------------------------------------------------------------
 # Read the data from the source files - in order to connect to sqlite3, you
 # do not have to do anything. It is the default mode.
+source_path = os.path.join(os.getcwd(), "../../../data/consumer_expenditures/raw/")
 
 csv_fnames = [
-    RAW_DATA_FOLDER + "expd151.csv",
-    RAW_DATA_FOLDER + "expd152.csv",
-    RAW_DATA_FOLDER + "expd153.csv",
-    RAW_DATA_FOLDER + "expd154.csv"
+    os.path.join(source_path, "expd151.csv"),
+    os.path.join(source_path, "expd152.csv"),
+    os.path.join(source_path, "expd153.csv"),
+    os.path.join(source_path, "expd154.csv")
 ]
 
 query = database.sniff_csv("EXPD_RAW", csv_fnames)
