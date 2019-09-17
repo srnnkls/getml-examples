@@ -9,7 +9,7 @@ started](python/getting_started/getting_started.ipynb) guide as well
 as in the [code snippets](python/snippets/) highlighting and
 explaining different core aspects of the API. A more thorough guide to
 the analysis of real-world problems can be found in [consumer
-expenditures](python/projects/consumer_expenditures/consumer_expenditures.ipynb)
+expenditures](python/projects/consumer_expenditures/)
 project.
 
 The **getML** Python API documentation can be found in

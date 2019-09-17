@@ -7,4 +7,4 @@ Python script in [getting_started.py](getting_started.py).
 
 For more information about the data set as well as a more thorough
 explanation of its analysis can be found in the
-[consumer_expenditure](../consumer_expenditure/) project.
+[consumer_expenditures](../consumer_expenditures/) project.
