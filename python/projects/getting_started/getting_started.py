@@ -23,6 +23,7 @@
 ## -------------------------------------------------------------------
 
 import pandas as pd
+import os
 
 import getml.aggregations as aggregations
 import getml.engine as engine
@@ -35,14 +36,16 @@ import getml.predictors as predictors
 
 ## Setting a project the getML engine will bundle all fitted models
 ## and saved DataFrames in.
-engine.set_project("CE")
+engine.set_project("gettingStarted")
 
 ## -------------------------------------------------------------------
 
 ## Load all required data from disk.
-CE_population_training = pd.read_csv("../../../data/consumer_expenditure/CE_population_training.csv")
-CE_population_validation = pd.read_csv("../../../data/consumer_expenditure/CE_population_validation.csv")
-CE_peripheral = pd.read_csv("../../../data/consumer_expenditure/CE_peripheral.csv")
+source_path = os.path.join(os.getcwd(), "../../../data/consumer_expenditures/")
+
+CE_population_training = pd.read_csv(os.path.join(source_path, "CE_population_training.csv"))
+CE_population_validation = pd.read_csv(os.path.join(source_path, "CE_population_validation.csv"))
+CE_peripheral = pd.read_csv(os.path.join(source_path, "CE_peripheral.csv"))
 
 ## -------------------------------------------------------------------
 ## Declare variables specifying the type of the individual columns to

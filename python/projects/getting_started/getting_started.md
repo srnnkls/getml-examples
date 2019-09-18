@@ -86,14 +86,18 @@ project in the **getML** engine and loading the prepared tables into
 the Python environment.
 
 ```python
+import os
 import pandas as pd
-import getml.engine
+import getml.engine as engine
 
-engine.set_project("CE")
+engine.set_project("gettingStarted")
 
-CE_population_training = pd.read_csv("../../../data/consumer_expenditure/CE_population_training.csv")
-CE_population_validation = pd.read_csv("../../../data/consumer_expenditure/CE_population_validation.csv")
-CE_peripheral = pd.read_csv("../../../data/consumer_expenditure/CE_peripheral.csv")
+# Location inside this repository the data is kept.
+source_path = os.path.join(os.getcwd(), "../../../data/consumer_expenditures/")
+
+CE_population_training = pd.read_csv(os.path.join(source_path, "CE_population_training.csv"))
+CE_population_validation = pd.read_csv(os.path.join(source_path, "CE_population_validation.csv"))
+CE_peripheral = pd.read_csv(os.path.join(source_path, "CE_peripheral.csv"))
 
 ```
 
@@ -321,6 +325,8 @@ scores = model.score(
     population_table=df_population_validation,
     peripheral_tables=[df_peripheral]
 )
+
+print(scores)
 ```
 
 Right now, **getML** supports six different scores: accuracy, AUC
