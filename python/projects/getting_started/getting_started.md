@@ -9,7 +9,7 @@ description = ""
 This short blog post gets you started with **getML**. You will learn
 the basic steps and commands to tackle your data science project using
 its Python API. The underlying Python script can be accessed
-[here](consumer_expenditure.py).
+[here](getting_started.py).
 
 # Motivation / Problem
 
@@ -132,10 +132,12 @@ TIME_STAMPS = [
     "TIME_STAMP_SHIFTED"]
 ```
 
-We will also assign units to indicate which columns should be
-compared and to fine-tune their handling. More information about this
-subject can be found in the [long read](/link/long/) and the [API
-documentation](https://docs.get.ml).
+We will also assign units to indicate which columns should be compared
+and to fine-tune their handling. More information about this subject
+can be found in the [comprehensive
+analysis](https://docs.get.ml/latest/tutorial/consumer_expenditure/index.html)
+of the data and the [API documentation](https://docs.get.ml) in
+general.
 
 ```python
 units = dict()
@@ -227,7 +229,7 @@ CE_placeholder.join(
 )
 ```
 
-For more information about this steps please have a look at [detailed description](/link/post/).
+For more information about this steps please have a look at [detailed description](https://docs.get.ml/latest/tutorial/consumer_expenditure/ce_train_single_autosql_model.html).
 
 ## Feature selector and predictor
 
