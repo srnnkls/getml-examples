@@ -103,7 +103,7 @@ model = models.AutoSQLModel(
     share_aggregations=1.0,
     max_length=1,
     num_threads=0,
-    lag=1.0 # Define the lag variable
+    delta_t=1.0 # Define the time delta
 ).send()
 
 # ----------------

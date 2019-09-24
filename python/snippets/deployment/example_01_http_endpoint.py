@@ -183,10 +183,10 @@ model = models.AutoSQLModel(
 
 # ----------------
 
-#model = model.fit(
-#    population_table=population_on_engine,
-#    peripheral_tables=[peripheral_on_engine]
-#)
+model = model.fit(
+    population_table=population_on_engine,
+    peripheral_tables=[peripheral_on_engine]
+)
 
 # ----------------
 
@@ -308,9 +308,9 @@ print(response)
 
 peripheral_on_engine.to_db("PERIPHERAL")
 
-# A problem with SQL queries is that they often contain the
+# A problem with SQL queries is that they often contain a
 # quotation mark, which can create  conflicts with the JSON syntax. 
-# Lucikly, the json module in the Python standard library
+# Luckily, the json module in the Python standard library
 # is smart enough to automatically escape quotation marks.
 data4 = {
     "peripheral": [{
