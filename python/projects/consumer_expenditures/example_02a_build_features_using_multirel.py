@@ -69,7 +69,7 @@ predictor = predictors.XGBoostClassifier(
 
 #predictor = predictors.LogisticRegression()
 
-model = models.AutoSQLModel(
+model = models.MultirelModel(
     population=CE_placeholder,
     peripheral=[CE_placeholder],
     loss_function=loss_functions.CrossEntropyLoss(),

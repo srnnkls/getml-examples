@@ -167,7 +167,7 @@ population_placeholder.join(peripheral_placeholder, "join_key", "time_stamp")
 
 predictor = predictors.LinearRegression()
 
-model = models.AutoSQLModel(
+model = models.MultirelModel(
     name="MyModel",
     aggregation=[
         aggregations.Count,

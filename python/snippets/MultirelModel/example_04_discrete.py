@@ -23,7 +23,6 @@ import pandas as pd
 
 import getml.aggregations as aggregations
 import getml.engine as engine
-import getml.hyperopt as hyperopt
 import getml.loss_functions as loss_functions
 import getml.models as models
 import getml.predictors as predictors
@@ -36,29 +35,29 @@ engine.set_project("examples")
 # Generate artificial dataset
 # The problem we create looks like this:
 #
-# SELECT COUNT( * )
+# SELECT MIN( t2.column_01 )
 # FROM POPULATION t1
 # LEFT JOIN PERIPHERAL t2
 # ON t1.join_key = t2.join_key
 # WHERE (
-#    ( t1.time_stamp - t2.time_stamp <= 0.5 )
+#    ( t2.column_01 > 0 )
 # ) AND t2.time_stamp <= t1.time_stamp
 # GROUP BY t1.join_key,
 #          t1.time_stamp;
 #
 # Don't worry - you don't really have to understand this part.
 # This is just how we generate the example dataset. To learn more
-# about getML just skip to "Build model".
+# about Multirel just skip to "Build model".
 
 population_table = pd.DataFrame()
-population_table["column_01"] = np.random.rand(1000) * 2.0 - 1.0
-population_table["join_key"] = range(1000)
-population_table["time_stamp_population"] = np.random.rand(1000)
+population_table["column_01"] = np.random.rand(500) * 2.0 - 1.0
+population_table["join_key"] = range(500)
+population_table["time_stamp_population"] = np.random.rand(500)
 
 peripheral_table = pd.DataFrame()
-peripheral_table["column_01"] = np.random.rand(125000) * 2.0 - 1.0
+peripheral_table["column_01"] = np.round(np.random.rand(125000) * 20.0 - 10.0)
 peripheral_table["join_key"] = [
-    int(1000.0 * np.random.rand(1)[0]) for i in range(125000)]
+    int(500.0 * np.random.rand(1)[0]) for i in range(125000)]
 peripheral_table["time_stamp_peripheral"] = np.random.rand(125000)
 
 # ----------------
@@ -72,14 +71,14 @@ temp = peripheral_table.merge(
 # Apply some conditions
 temp = temp[
     (temp["time_stamp_peripheral"] <= temp["time_stamp_population"]) &
-    (temp["time_stamp_peripheral"] >= temp["time_stamp_population"] - 0.5)
+    (temp["column_01"] > 0.0)
 ]
 
 # Define the aggregation
 temp = temp[["column_01", "join_key"]].groupby(
     ["join_key"],
     as_index=False
-).count()
+).min()
 
 temp = temp.rename(index=str, columns={"column_01": "targets"})
 
@@ -107,61 +106,33 @@ population_table["targets"] = [
 ]
 
 # ----------------
-# Upload data to the getML engine
-
-peripheral_on_engine = engine.DataFrame(
-    name="PERIPHERAL",
-    join_keys=["join_key"],
-    numerical=["column_01"],
-    time_stamps=["time_stamp"]
-)
-
-peripheral_on_engine.send(
-    peripheral_table
-)
-
-population_on_engine_training = engine.DataFrame(
-    name="POPULATION_TRAINING",
-    join_keys=["join_key"],
-    numerical=["column_01"],
-    time_stamps=["time_stamp"],
-    targets=["targets"]
-)
-
-population_on_engine_training.send(
-    population_table[:500]
-)
-
-population_on_engine_validation = engine.DataFrame(
-    name="POPULATION_VALIDATION",
-    join_keys=["join_key"],
-    numerical=["column_01"],
-    time_stamps=["time_stamp"],
-    targets=["targets"]
-)
-
-population_on_engine_validation.send(
-    population_table[500:]
-)
-
-# ----------------
-# Build a reference model
+# Build model
 
 population_placeholder = models.Placeholder(
-    name="POPULATION"
+    name="POPULATION",
+    numerical=["column_01"],
+    join_keys=["join_key"],
+    time_stamps=["time_stamp"],
+    targets=["targets"]
 )
 
 peripheral_placeholder = models.Placeholder(
-    name="PERIPHERAL"
+    name="PERIPHERAL",
+    discrete=["column_01"],
+    join_keys=["join_key"],
+    time_stamps=["time_stamp"]
 )
 
 population_placeholder.join(peripheral_placeholder, "join_key", "time_stamp")
 
 predictor = predictors.LinearRegression()
 
-model = models.AutoSQLModel(
+model = models.MultirelModel(
     aggregation=[
+        aggregations.Avg,
         aggregations.Count,
+        aggregations.Max,
+        aggregations.Min,
         aggregations.Sum
     ],
     population=population_placeholder,
@@ -175,45 +146,37 @@ model = models.AutoSQLModel(
 ).send()
 
 # ----------------
-# Build a hyperparameter space 
 
-param_space = dict()
-
-param_space['grid_factor'] = [1.0, 16.0]
-param_space['min_num_samples'] = [100, 500]
-param_space['num_features'] = [2, 10]
-param_space['shrinkage'] = [0.0, 0.3]
-
-# Any hyperparameters that relate to the predictor
-# are preceded by "predictor__".
-param_space['predictor__lambda'] = [0.0, 0.00001]
-
-# ----------------
-# Wrap a RandomSearch around the reference model
-
-random_search = hyperopt.RandomSearch(
-    model=model,
-    param_space=param_space,
-    n_iter=10
-)
-
-random_search.fit(
-  population_table_training=population_on_engine_training,
-  population_table_validation=population_on_engine_validation,
-  peripheral_tables=[peripheral_on_engine]
+model = model.fit(
+    population_table=population_table,
+    peripheral_tables=[peripheral_table]
 )
 
 # ----------------
-# Wrap a LatinHypercubeSearch around the reference model
 
-latin_search = hyperopt.LatinHypercubeSearch(
-    model=model,
-    param_space=param_space,
-    n_iter=10
+features = model.transform(
+    population_table=population_table,
+    peripheral_tables=[peripheral_table]
 )
 
-latin_search.fit(
-  population_table_training=population_on_engine_training,
-  population_table_validation=population_on_engine_validation,
-  peripheral_tables=[peripheral_on_engine]
+# ----------------
+
+yhat = model.predict(
+    population_table=population_table,
+    peripheral_tables=[peripheral_table]
 )
+
+# ----------------
+
+print(model.to_sql())
+
+# ----------------
+
+scores = model.score(
+    population_table=population_table,
+    peripheral_tables=[peripheral_table]
+)
+
+print(scores)
+
+# ----------------

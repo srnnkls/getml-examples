@@ -173,9 +173,9 @@ predictor = predictors.XGBoostClassifier(
     reg_lambda=500)
 
 ## -------------------------------------------------------------------
-## Construct an AutoSQL model and upload it to the getML engine.
+## Construct an Multirel model and upload it to the getML engine.
 
-model = models.AutoSQLModel(
+model = models.MultirelModel(
     population=CE_placeholder,
     peripheral=[CE_placeholder],
     predictor=predictor,
@@ -204,7 +204,7 @@ model = models.AutoSQLModel(
 ).send()
 
 ## -------------------------------------------------------------------
-## Create features from the data using the AutoSQL algorithm and use
+## Create features from the data using the Multirel algorithm and use
 ## them to train the predictor.
 
 model = model.fit(

@@ -36,7 +36,7 @@ engine.set_project("examples")
 #
 # Don't worry - you don't really have to understand this part.
 # This is just how we generate the example dataset. To learn more
-# about AutoSQL just skip to "Build data model".
+# about Multirel just skip to "Build data model".
 
 population_table = pd.DataFrame()
 population_table["column_01"] = np.random.rand(500) * 2.0 - 1.0
@@ -173,7 +173,7 @@ population_placeholder.join(peripheral_placeholder, "join_key", "time_stamp")
 
 predictor = predictors.LinearRegression()
 
-model = models.AutoSQLModel(
+model = models.MultirelModel(
     aggregation=[
         aggregations.Avg,
         aggregations.Count,

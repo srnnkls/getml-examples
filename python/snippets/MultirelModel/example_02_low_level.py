@@ -36,27 +36,26 @@ engine.set_project("examples")
 # The problem we create looks like this:
 #
 # SELECT COUNT( * )
-# FROM POPULATION_TABLE t1
-# LEFT JOIN PERIPHERAL_TABLE t2
+# FROM POPULATION t1
+# LEFT JOIN PERIPHERAL t2
 # ON t1.join_key = t2.join_key
 # WHERE (
-#    ( t2.column_01 != '1' AND t2.column_01 != '2' AND t2.column_01 != '9' )
-# ) AND t2.time_stamps <= t1.time_stamps
-# GROUP BY t2.join_key;
+#    ( t1.time_stamp - t2.time_stamp <= 0.5 )
+# ) AND t2.time_stamp <= t1.time_stamp
+# GROUP BY t1.join_key,
+#          t1.time_stamp;
 #
 # Don't worry - you don't really have to understand this part.
 # This is just how we generate the example dataset. To learn more
 # about getML just skip to "Build model".
 
 population_table = pd.DataFrame()
-population_table["column_01"] = (np.random.rand(
-    500)*10.0).astype(np.int).astype(np.str)
+population_table["column_01"] = np.random.rand(500) * 2.0 - 1.0
 population_table["join_key"] = range(500)
 population_table["time_stamp_population"] = np.random.rand(500)
 
 peripheral_table = pd.DataFrame()
-peripheral_table["column_01"] = (np.random.rand(
-    125000)*10.0).astype(np.int).astype(np.str)
+peripheral_table["column_01"] = np.random.rand(125000) * 2.0 - 1.0
 peripheral_table["join_key"] = [
     int(500.0 * np.random.rand(1)[0]) for i in range(125000)]
 peripheral_table["time_stamp_peripheral"] = np.random.rand(125000)
@@ -72,9 +71,7 @@ temp = peripheral_table.merge(
 # Apply some conditions
 temp = temp[
     (temp["time_stamp_peripheral"] <= temp["time_stamp_population"]) &
-    (temp["column_01"] != "1") &
-    (temp["column_01"] != "2") &
-    (temp["column_01"] != "9")
+    (temp["time_stamp_peripheral"] >= temp["time_stamp_population"] - 0.5)
 ]
 
 # Define the aggregation
@@ -108,18 +105,18 @@ population_table["targets"] = [
     0.0 if val != val else val for val in population_table["targets"]
 ]
 
-#----------------
+# ----------------
 # Upload data to the getML engine
 
 peripheral_on_engine = engine.DataFrame(
     name="PERIPHERAL",
     join_keys=["join_key"],
-    categorical=["column_01"],
+    numerical=["column_01"],
     time_stamps=["time_stamp"]
 )
 
 # The low-level API allows you to upload
-# data to the AutoSQL engine in a piecewise fashion.
+# data to the getML engine in a piecewise fashion.
 # Here we load the first part of the pandas.DataFrame...
 peripheral_on_engine.send(
     peripheral_table[:2000]
@@ -133,12 +130,13 @@ peripheral_on_engine.append(
 population_on_engine = engine.DataFrame(
     name="POPULATION",
     join_keys=["join_key"],
+    numerical=["column_01"],
     time_stamps=["time_stamp"],
     targets=["targets"]
 )
 
 # The low-level API allows you to upload
-# data to the AutoSQL engine in a piecewise fashion.
+# data to the getML engine in a piecewise fashion.
 # Here we load the first part of the pandas.DataFrame...
 population_on_engine.send(
     population_table[:20]
@@ -164,7 +162,7 @@ population_placeholder.join(peripheral_placeholder, "join_key", "time_stamp")
 
 predictor = predictors.LinearRegression()
 
-model = models.AutoSQLModel(
+model = models.MultirelModel(
     aggregation=[
         aggregations.Count,
         aggregations.Sum

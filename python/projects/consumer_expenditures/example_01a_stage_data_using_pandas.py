@@ -31,7 +31,7 @@ expd = expd.append(pd.read_csv(os.path.join(source_path, "expd154.csv")))
 expd["TARGET"] = [0.0 if elem == 2 else 1.0 for elem in expd["GIFT"]]
 
 # -----------------------------------------------------------------------------
-# Remove the instances where date is nan - they will be ignored by the AutoSQL
+# Remove the instances where date is nan - they will be ignored by the Multirel
 # engine anyway, because of the NULL value handling policy.
 
 expd = expd[
@@ -95,7 +95,7 @@ units["UCC4"] = "UCC4"
 units["UCC5"] = "UCC5"
 
 # Adding 'comparison only' to the unit
-# forces AutoSQL to always compare this
+# forces Multirel to always compare this
 # column to others.
 units["EXPNYR"] = "year, comparison only"
 

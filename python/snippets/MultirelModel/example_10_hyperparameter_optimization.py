@@ -23,6 +23,7 @@ import pandas as pd
 
 import getml.aggregations as aggregations
 import getml.engine as engine
+import getml.hyperopt as hyperopt
 import getml.loss_functions as loss_functions
 import getml.models as models
 import getml.predictors as predictors
@@ -50,14 +51,14 @@ engine.set_project("examples")
 # about getML just skip to "Build model".
 
 population_table = pd.DataFrame()
-population_table["column_01"] = np.random.rand(500) * 2.0 - 1.0
-population_table["join_key"] = range(500)
-population_table["time_stamp_population"] = np.random.rand(500)
+population_table["column_01"] = np.random.rand(1000) * 2.0 - 1.0
+population_table["join_key"] = range(1000)
+population_table["time_stamp_population"] = np.random.rand(1000)
 
 peripheral_table = pd.DataFrame()
 peripheral_table["column_01"] = np.random.rand(125000) * 2.0 - 1.0
 peripheral_table["join_key"] = [
-    int(500.0 * np.random.rand(1)[0]) for i in range(125000)]
+    int(1000.0 * np.random.rand(1)[0]) for i in range(125000)]
 peripheral_table["time_stamp_peripheral"] = np.random.rand(125000)
 
 # ----------------
@@ -115,40 +116,36 @@ peripheral_on_engine = engine.DataFrame(
     time_stamps=["time_stamp"]
 )
 
-# The low-level API allows you to upload
-# data to the getML engine in a piecewise fashion.
-# Here we load the first part of the pandas.DataFrame...
 peripheral_on_engine.send(
-    peripheral_table[:2000]
+    peripheral_table
 )
 
-# ...and now we load the second part
-peripheral_on_engine.append(
-    peripheral_table[2000:]
-)
-
-population_on_engine = engine.DataFrame(
-    name="POPULATION",
+population_on_engine_training = engine.DataFrame(
+    name="POPULATION_TRAINING",
     join_keys=["join_key"],
     numerical=["column_01"],
     time_stamps=["time_stamp"],
     targets=["targets"]
 )
 
-# The low-level API allows you to upload
-# data to the getML engine in a piecewise fashion.
-# Here we load the first part of the pandas.DataFrame...
-population_on_engine.send(
-    population_table[:20]
+population_on_engine_training.send(
+    population_table[:500]
 )
 
-# ...and now we load the second part
-population_on_engine.append(
-   population_table[20:]
+population_on_engine_validation = engine.DataFrame(
+    name="POPULATION_VALIDATION",
+    join_keys=["join_key"],
+    numerical=["column_01"],
+    time_stamps=["time_stamp"],
+    targets=["targets"]
+)
+
+population_on_engine_validation.send(
+    population_table[500:]
 )
 
 # ----------------
-# Build model
+# Build a reference model
 
 population_placeholder = models.Placeholder(
     name="POPULATION"
@@ -162,7 +159,7 @@ population_placeholder.join(peripheral_placeholder, "join_key", "time_stamp")
 
 predictor = predictors.LinearRegression()
 
-model = models.AutoSQLModel(
+model = models.MultirelModel(
     aggregation=[
         aggregations.Count,
         aggregations.Sum
@@ -178,38 +175,45 @@ model = models.AutoSQLModel(
 ).send()
 
 # ----------------
+# Build a hyperparameter space 
 
-model = model.fit(
-    population_table=population_on_engine,
-    peripheral_tables=[peripheral_on_engine]
+param_space = dict()
+
+param_space['grid_factor'] = [1.0, 16.0]
+param_space['min_num_samples'] = [100, 500]
+param_space['num_features'] = [2, 10]
+param_space['shrinkage'] = [0.0, 0.3]
+
+# Any hyperparameters that relate to the predictor
+# are preceded by "predictor__".
+param_space['predictor__lambda'] = [0.0, 0.00001]
+
+# ----------------
+# Wrap a RandomSearch around the reference model
+
+random_search = hyperopt.RandomSearch(
+    model=model,
+    param_space=param_space,
+    n_iter=10
+)
+
+random_search.fit(
+  population_table_training=population_on_engine_training,
+  population_table_validation=population_on_engine_validation,
+  peripheral_tables=[peripheral_on_engine]
 )
 
 # ----------------
+# Wrap a LatinHypercubeSearch around the reference model
 
-features = model.transform(
-    population_table=population_on_engine,
-    peripheral_tables=[peripheral_on_engine]
+latin_search = hyperopt.LatinHypercubeSearch(
+    model=model,
+    param_space=param_space,
+    n_iter=10
 )
 
-# ----------------
-
-yhat = model.predict(
-    population_table=population_on_engine,
-    peripheral_tables=[peripheral_on_engine]
+latin_search.fit(
+  population_table_training=population_on_engine_training,
+  population_table_validation=population_on_engine_validation,
+  peripheral_tables=[peripheral_on_engine]
 )
-
-# ----------------
-
-print(model.to_sql())
-
-# ----------------
-# By the way, passing pandas.DataFrames still works.
-
-scores = model.score(
-    population_table=population_table,
-    peripheral_tables=[peripheral_table]
-)
-
-print(scores)
-
-# ----------------

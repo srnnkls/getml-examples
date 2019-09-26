@@ -43,6 +43,8 @@ time_series["join_key"] = np.zeros(1000).astype(int).astype(str)
 time_series["time_stamp"] = np.arange(1000.0)
 time_series["time_stamp_lagged"] = time_series["time_stamp"] - 1.0 
 
+time_series["upper_time_stamp"] = time_series["time_stamp"] + 20.0 
+
 time_series["column_01"] = np.sin(np.pi*time_series["time_stamp"]/5.0) + time_series["time_stamp"]*0.1
 
 # ----------------
@@ -63,7 +65,7 @@ peripheral_on_engine = engine.DataFrame(
     name="PERIPHERAL",
     join_keys=["join_key"],
     numerical=["column_01"],
-    time_stamps=["time_stamp"]
+    time_stamps=["time_stamp", "upper_time_stamp"]
 )
 
 peripheral_on_engine.send(
@@ -86,11 +88,12 @@ population_placeholder.join(
   join_key="join_key", 
   time_stamp="time_stamp_lagged",
   other_time_stamp="time_stamp",
+  upper_time_stamp="upper_time_stamp"
 )
 
 predictor = predictors.LinearRegression()
 
-model = models.AutoSQLModel(
+model = models.MultirelModel(
     aggregation=[
         aggregations.Count,
         aggregations.Sum

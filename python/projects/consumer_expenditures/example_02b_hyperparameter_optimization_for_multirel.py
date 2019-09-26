@@ -71,7 +71,7 @@ predictor = predictors.XGBoostClassifier(
     reg_lambda=500
 )
 
-model = models.AutoSQLModel(
+model = models.MultirelModel(
     population=CE_placeholder,
     peripheral=[CE_placeholder],
     loss_function=loss_functions.CrossEntropyLoss(),
