@@ -97,14 +97,14 @@ model = models.MultirelModel(
 
 param_space = dict()
 
-param_space["grid_factor"]: [1.0, 16.0]
-param_space["max_length"]: [1, 10]
-param_space["min_num_samples"]: [100, 500]
-param_space["num_features"]: [10, 500]
-param_space["regularization"]: [0.0, 0.01]
-param_space["share_aggregations"]: [0.01, 0.3]
-param_space["share_selected_features"]: [0.1, 1.0]
-param_space["shrinkage"]: [0.01, 0.4]
+param_space["grid_factor"] = [1.0, 16.0]
+param_space["max_length"] = [1, 10]
+param_space["min_num_samples"] = [100, 500]
+param_space["num_features"] = [10, 500]
+param_space["regularization"] = [0.0, 0.01]
+param_space["share_aggregations"] = [0.01, 0.3]
+param_space["share_selected_features"] = [0.1, 1.0]
+param_space["shrinkage"] = [0.01, 0.4]
 
 # Any hyperparameters that relate to the predictor
 # are preceded by "predictor__".
