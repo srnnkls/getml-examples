@@ -120,7 +120,7 @@ param_space["predictor__reg_lambda"] = [0.0, 1000.0]
 latin_search = hyperopt.LatinHypercubeSearch(
     model=model,
     param_space=param_space,
-    n_iter=2
+    n_iter=10
 )
 
 latin_search.fit(
