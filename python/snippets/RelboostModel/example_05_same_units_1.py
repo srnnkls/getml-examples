@@ -1,4 +1,4 @@
-## Copyright 2019 The SQLNet Company GmbH
+# Copyright 2019 The SQLNet Company GmbH
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to
@@ -17,9 +17,6 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
-
-import json
-import urllib
 
 import numpy as np
 import pandas as pd
@@ -49,103 +46,66 @@ engine.set_project("examples")
 # GROUP BY t1.join_key,
 #          t1.time_stamp;
 
-population_table, peripheral_table = datasets.make_numerical()
-
-# ----------------
-# Upload data to the getML engine
-
-peripheral_on_engine = engine.DataFrame(
-    name="PERIPHERAL",
-    join_keys=["join_key"],
-    numerical=["column_01"],
-    time_stamps=["time_stamp"]
-)
-
-# The low-level API allows you to upload
-# data to the getML engine in a piecewise fashion.
-# Here we load the first part of the pandas.DataFrame...
-peripheral_on_engine.send(
-    peripheral_table[:2000]
-)
-
-# ...and now we load the second part
-peripheral_on_engine.append(
-    peripheral_table[2000:]
-)
-
-population_on_engine = engine.DataFrame(
-    name="POPULATION",
-    join_keys=["join_key"],
-    numerical=["column_01"],
-    time_stamps=["time_stamp"],
-    targets=["targets"]
-)
-
-# The low-level API allows you to upload
-# data to the getML engine in a piecewise fashion.
-# Here we load the first part of the pandas.DataFrame...
-population_on_engine.send(
-    population_table[:20]
-)
-
-# ...and now we load the second part
-population_on_engine.append(
-   population_table[20:]
-)
+population_table, peripheral_table = datasets.make_same_units_numerical()
 
 # ----------------
 # Build model
 
+units = dict()
+
+units["column_01"] = "unit_01"
+
 population_placeholder = models.Placeholder(
-    name="POPULATION"
+    name="POPULATION",
+    numerical=["column_01"],
+    join_keys=["join_key"],
+    time_stamps=["time_stamp"],
+    targets=["targets"]
 )
 
 peripheral_placeholder = models.Placeholder(
-    name="PERIPHERAL"
+    name="PERIPHERAL",
+    numerical=["column_01"],
+    join_keys=["join_key"],
+    time_stamps=["time_stamp"]
 )
 
 population_placeholder.join(peripheral_placeholder, "join_key", "time_stamp")
 
 predictor = predictors.LinearRegression()
 
-model = models.MultirelModel(
-    name="MyModel",
-    aggregation=[
-        aggregations.Count,
-        aggregations.Sum
-    ],
+model = models.RelboostModel(
     population=population_placeholder,
     peripheral=[peripheral_placeholder],
     loss_function=loss_functions.SquareLoss(),
     predictor=predictor,
-    include_categorical=True,
     num_features=10,
-    share_aggregations=1.0,
-    max_length=1,
-    num_threads=0
+    max_depth=1,
+    reg_lambda=0.0,
+    shrinkage=0.3,
+    num_threads=0,
+    units=units # Insert the units
 ).send()
 
 # ----------------
 
 model = model.fit(
-    population_table=population_on_engine,
-    peripheral_tables=[peripheral_on_engine]
+    population_table=population_table,
+    peripheral_tables=[peripheral_table]
 )
 
 # ----------------
 
-model.transform(
-    population_table=population_on_engine,
-    peripheral_tables=[peripheral_on_engine],
-    table_name="MyModel_Features"
+features = model.transform(
+    population_table=population_table,
+    peripheral_tables=[peripheral_table]
 )
 
 # ----------------
 
-model.predict(
-    population_table=population_on_engine,
-    peripheral_tables=[peripheral_on_engine],
-    table_name="MyModel_Predictions"
+yhat = model.predict(
+    population_table=population_table,
+    peripheral_tables=[peripheral_table]
 )
 
 # ----------------
@@ -153,7 +113,6 @@ model.predict(
 print(model.to_sql())
 
 # ----------------
-# By the way, passing pandas.DataFrames still works.
 
 scores = model.score(
     population_table=population_table,
@@ -162,3 +121,4 @@ scores = model.score(
 
 print(scores)
 
+# ----------------

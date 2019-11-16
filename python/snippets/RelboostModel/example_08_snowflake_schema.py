@@ -1,4 +1,4 @@
-# Copyright 2019 The SQLNet Company GmbH
+# Copyright 2018 The SQLNet Company GmbH
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to
@@ -22,121 +22,93 @@ import numpy as np
 import pandas as pd
 
 import getml.aggregations as aggregations
+import getml.datasets as datasets
 import getml.engine as engine
 import getml.loss_functions as loss_functions
 import getml.models as models
 import getml.predictors as predictors
 
-# ----------------
+#----------------
 
 engine.set_project("examples")
 
-# ----------------
+#----------------
 # Generate artificial dataset
-# The problem we create looks like this:
 
-time_series = pd.DataFrame()
-
-time_series["join_key"] = np.zeros(1000).astype(int).astype(str)
-
-time_series["time_stamp"] = np.arange(1000.0)
-time_series["time_stamp_lagged"] = time_series["time_stamp"] - 1.0 
-
-time_series["column_01"] = np.sin(np.pi*time_series["time_stamp"]/5.0) + time_series["time_stamp"]*0.1
-
-# ----------------
-# Upload data to the getML engine
-
-population_on_engine = engine.DataFrame(
-    name="POPULATION",
-    join_keys=["join_key"],
-    targets=["column_01"],
-    time_stamps=["time_stamp_lagged"]
-)
-
-population_on_engine.send(
-    time_series
-)
-
-peripheral_on_engine = engine.DataFrame(
-    name="PERIPHERAL",
-    join_keys=["join_key"],
-    numerical=["column_01"],
-    time_stamps=["time_stamp"]
-)
-
-peripheral_on_engine.send(
-    time_series
+population_table, peripheral_table, peripheral_table2 = datasets.make_snowflake(
+    aggregation1=aggregations.Avg,
+    aggregation2=aggregations.Count
 )
 
 # ----------------
-# Build model
+# Build data model
 
 population_placeholder = models.Placeholder(
-    name="TIME_SERIES"
+    name="POPULATION",
+    numerical=["column_01"],
+    join_keys=["join_key"],
+    time_stamps=["time_stamp"],
+    targets=["targets"]
 )
 
 peripheral_placeholder = models.Placeholder(
-    name="TIME_SERIES"
+    name="PERIPHERAL",
+    numerical=["column_01"],
+    join_keys=["join_key", "join_key2"],
+    time_stamps=["time_stamp"]
 )
 
-population_placeholder.join(
-  peripheral_placeholder, 
-  join_key="join_key", 
-  time_stamp="time_stamp_lagged",
-  other_time_stamp="time_stamp",
+peripheral2_placeholder = models.Placeholder(
+    name="PERIPHERAL2",
+    numerical=["column_01"],
+    join_keys=["join_key2"],
+    time_stamps=["time_stamp"]
 )
+
+peripheral_placeholder.join(peripheral2_placeholder, "join_key2", "time_stamp")
+
+population_placeholder.join(peripheral_placeholder, "join_key", "time_stamp")
 
 predictor = predictors.LinearRegression()
 
-model = models.MultirelModel(
-    aggregation=[
-        aggregations.Count,
-        aggregations.Sum
-    ],
+model = models.RelboostModel(
     population=population_placeholder,
-    peripheral=[peripheral_placeholder],
+    peripheral=[peripheral_placeholder, peripheral2_placeholder],
     loss_function=loss_functions.SquareLoss(),
     predictor=predictor,
     num_features=10,
-    share_aggregations=1.0,
-    max_length=1,
-    num_threads=0,
-    delta_t=1.0 # Define the time delta
+    num_subfeatures=4,
+    max_depth=1,
+    gamma=0.0,
+    reg_lambda=0.0,
+    shrinkage=0.4,
+    num_threads=0
 ).send()
 
 # ----------------
+# Fit model
 
 model = model.fit(
-    population_table=population_on_engine,
-    peripheral_tables=[peripheral_on_engine]
+    population_table=population_table,
+    peripheral_tables=[peripheral_table, peripheral_table2]
 )
-
-# ----------------
 
 features = model.transform(
-    population_table=population_on_engine,
-    peripheral_tables=[peripheral_on_engine]
+    population_table=population_table,
+    peripheral_tables=[peripheral_table, peripheral_table2]
 )
-
-# ----------------
 
 yhat = model.predict(
-    population_table=population_on_engine,
-    peripheral_tables=[peripheral_on_engine]
+    population_table=population_table,
+    peripheral_tables=[peripheral_table, peripheral_table2]
 )
-
-# ----------------
 
 print(model.to_sql())
 
-# ----------------
-
 scores = model.score(
-    population_table=population_on_engine,
-    peripheral_tables=[peripheral_on_engine]
+    population_table=population_table,
+    peripheral_tables=[peripheral_table, peripheral_table2]
 )
 
 print(scores)
 
-# ----------------

@@ -22,6 +22,7 @@ import numpy as np
 import pandas as pd
 
 import getml.aggregations as aggregations
+import getml.datasets as datasets
 import getml.engine as engine
 import getml.loss_functions as loss_functions
 import getml.models as models
@@ -33,114 +34,11 @@ engine.set_project("examples")
 
 #----------------
 # Generate artificial dataset
-#
-# Don't worry - you don't really have to understand this part.
-# This is just how we generate the example dataset. To learn more
-# about Multirel just skip to "Build data model".
 
-population_table = pd.DataFrame()
-population_table["column_01"] = np.random.rand(500) * 2.0 - 1.0
-population_table["join_key"] = range(500)
-population_table["time_stamp_population"] = np.random.rand(500)
-
-peripheral_table = pd.DataFrame()
-peripheral_table["column_01"] = np.random.rand(5000) * 2.0 - 1.0
-peripheral_table["join_key"] = [
-    int(500.0 * np.random.rand(1)[0]) for i in range(5000)]
-peripheral_table["join_key2"] = range(5000)
-peripheral_table["time_stamp_peripheral"] = np.random.rand(5000)
-
-peripheral_table2 = pd.DataFrame()
-peripheral_table2["column_01"] = np.random.rand(125000) * 2.0 - 1.0
-peripheral_table2["join_key2"] = [
-    int(5000.0 * np.random.rand(1)[0]) for i in range(125000)]
-peripheral_table2["time_stamp_peripheral2"] = np.random.rand(125000)
-
-# ----------------
-# Merge peripheral_table with peripheral_table2
-
-temp = peripheral_table2.merge(
-    peripheral_table[["join_key2", "time_stamp_peripheral"]],
-    how="left",
-    on="join_key2"
+population_table, peripheral_table, peripheral_table2 = datasets.make_snowflake(
+    aggregation1=aggregations.Avg,
+    aggregation2=aggregations.Count
 )
-
-# Apply some conditions
-temp = temp[
-    (temp["time_stamp_peripheral2"] <= temp["time_stamp_peripheral"]) &
-    (temp["time_stamp_peripheral2"] >= temp["time_stamp_peripheral"] - 0.5)
-]
-
-# Define the aggregation
-temp = temp[["column_01", "join_key2"]].groupby(
-    ["join_key2"],
-    as_index=False
-).count()
-
-temp = temp.rename(index=str, columns={"column_01": "temporary"})
-
-peripheral_table = peripheral_table.merge(
-    temp,
-    how="left",
-    on="join_key2"
-)
-
-del temp
-
-# Replace NaN with 0.0
-peripheral_table["temporary"] = [
-    0.0 if val != val else val for val in peripheral_table["temporary"]
-]
-
-# ----------------
-# Merge population_table with peripheral_table
-
-temp2 = peripheral_table.merge(
-    population_table[["join_key", "time_stamp_population"]],
-    how="left",
-    on="join_key"
-)
-
-# Apply some conditions
-temp2 = temp2[
-    (temp2["time_stamp_peripheral"] <= temp2["time_stamp_population"])
-]
-
-# Define the aggregation
-temp2 = temp2[["temporary", "join_key"]].groupby(
-    ["join_key"],
-    as_index=False
-).mean()
-
-temp2 = temp2.rename(index=str, columns={"temporary": "targets"})
-
-population_table = population_table.merge(
-    temp2,
-    how="left",
-    on="join_key"
-)
-
-del temp2
-
-# Replace NaN targets with 0.0 - target values may never be NaN!.
-population_table["targets"] = [
-    0.0 if val != val else val for val in population_table["targets"]
-]
-
-# Remove temporary column.
-del peripheral_table["temporary"]
-
-
-# ----------------
-
-population_table = population_table.rename(
-    index=str, columns={"time_stamp_population": "time_stamp"})
-
-peripheral_table = peripheral_table.rename(
-    index=str, columns={"time_stamp_peripheral": "time_stamp"})
-
-peripheral_table2 = peripheral_table2.rename(
-    index=str, columns={"time_stamp_peripheral2": "time_stamp"})
 
 # ----------------
 # Build data model

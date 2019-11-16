@@ -1,4 +1,4 @@
-## Copyright 2019 The SQLNet Company GmbH
+# Copyright 2019 The SQLNet Company GmbH
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to
@@ -17,9 +17,6 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
-
-import json
-import urllib
 
 import numpy as np
 import pandas as pd
@@ -94,7 +91,14 @@ population_on_engine.append(
 )
 
 # ----------------
-# Build model
+# For demonstration purposes, we add another target
+
+targets2 = population_on_engine.target("targets") * 2.0
+
+population_on_engine.add_target(targets2, "targets2")
+
+# ----------------
+# Construct placeholders
 
 population_placeholder = models.Placeholder(
     name="POPULATION"
@@ -108,8 +112,10 @@ population_placeholder.join(peripheral_placeholder, "join_key", "time_stamp")
 
 predictor = predictors.LinearRegression()
 
+# ----------------
+# MultirelModel can simultaneously optimize its features for several targets...
+
 model = models.MultirelModel(
-    name="MyModel",
     aggregation=[
         aggregations.Count,
         aggregations.Sum
@@ -118,7 +124,6 @@ model = models.MultirelModel(
     peripheral=[peripheral_placeholder],
     loss_function=loss_functions.SquareLoss(),
     predictor=predictor,
-    include_categorical=True,
     num_features=10,
     share_aggregations=1.0,
     max_length=1,
@@ -134,18 +139,16 @@ model = model.fit(
 
 # ----------------
 
-model.transform(
+features = model.transform(
     population_table=population_on_engine,
-    peripheral_tables=[peripheral_on_engine],
-    table_name="MyModel_Features"
+    peripheral_tables=[peripheral_on_engine]
 )
 
 # ----------------
 
-model.predict(
+yhat = model.predict(
     population_table=population_on_engine,
-    peripheral_tables=[peripheral_on_engine],
-    table_name="MyModel_Predictions"
+    peripheral_tables=[peripheral_on_engine]
 )
 
 # ----------------
@@ -153,12 +156,68 @@ model.predict(
 print(model.to_sql())
 
 # ----------------
-# By the way, passing pandas.DataFrames still works.
 
 scores = model.score(
-    population_table=population_table,
-    peripheral_tables=[peripheral_table]
+    population_table=population_on_engine,
+    peripheral_tables=[peripheral_on_engine]
 )
 
 print(scores)
+
+# ----------------
+# ...but RelboostModel is different. It needs to train
+# different features for every target.
+# This is because the weights need to be optimized
+# separately.
+
+for target_num in range(population_on_engine.n_targets):
+    model = models.RelboostModel(
+        population=population_placeholder,
+        peripheral=[peripheral_placeholder],
+        loss_function=loss_functions.SquareLoss(),
+        predictor=predictor,
+        num_features=10,
+        max_depth=1,
+        reg_lambda=0.0,
+        shrinkage=0.3,
+        target_num=target_num, # Setting the target_num
+        num_threads=0
+    ).send()
+
+    # ----------------
+
+    model = model.fit(
+        population_table=population_on_engine,
+        peripheral_tables=[peripheral_on_engine]
+    )
+
+    # ----------------
+
+    features = model.transform(
+        population_table=population_on_engine,
+        peripheral_tables=[peripheral_on_engine]
+    )
+
+    # ----------------
+
+    yhat = model.predict(
+        population_table=population_on_engine,
+        peripheral_tables=[peripheral_on_engine]
+    )
+
+    # ----------------
+
+    print(model.to_sql())
+
+    # ----------------
+
+    scores = model.score(
+        population_table=population_on_engine,
+        peripheral_tables=[peripheral_on_engine]
+    )
+
+    print(scores)
+
+    # ----------------
+
 

@@ -1,4 +1,4 @@
-## Copyright 2019 The SQLNet Company GmbH
+# Copyright 2019 The SQLNet Company GmbH
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to
@@ -17,9 +17,6 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
-
-import json
-import urllib
 
 import numpy as np
 import pandas as pd
@@ -108,20 +105,15 @@ population_placeholder.join(peripheral_placeholder, "join_key", "time_stamp")
 
 predictor = predictors.LinearRegression()
 
-model = models.MultirelModel(
-    name="MyModel",
-    aggregation=[
-        aggregations.Count,
-        aggregations.Sum
-    ],
+model = models.RelboostModel(
     population=population_placeholder,
     peripheral=[peripheral_placeholder],
     loss_function=loss_functions.SquareLoss(),
     predictor=predictor,
-    include_categorical=True,
     num_features=10,
-    share_aggregations=1.0,
-    max_length=1,
+    max_depth=1,
+    reg_lambda=0.0,
+    shrinkage=0.3,
     num_threads=0
 ).send()
 
@@ -134,18 +126,16 @@ model = model.fit(
 
 # ----------------
 
-model.transform(
+features = model.transform(
     population_table=population_on_engine,
-    peripheral_tables=[peripheral_on_engine],
-    table_name="MyModel_Features"
+    peripheral_tables=[peripheral_on_engine]
 )
 
 # ----------------
 
-model.predict(
+yhat = model.predict(
     population_table=population_on_engine,
-    peripheral_tables=[peripheral_on_engine],
-    table_name="MyModel_Predictions"
+    peripheral_tables=[peripheral_on_engine]
 )
 
 # ----------------
@@ -162,3 +152,4 @@ scores = model.score(
 
 print(scores)
 
+# ----------------

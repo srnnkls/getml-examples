@@ -22,6 +22,7 @@ import numpy as np
 import pandas as pd
 
 import getml.aggregations as aggregations
+import getml.datasets as datasets
 import getml.engine as engine
 import getml.loss_functions as loss_functions
 import getml.models as models
@@ -44,69 +45,8 @@ engine.set_project("examples")
 # ) AND t2.time_stamps <= t1.time_stamps
 # GROUP BY t2.join_key;
 #
-# Don't worry - you don't really have to understand this part.
-# This is just how we generate the example dataset. To learn more
-# about getML just skip to "Build model".
 
-population_table = pd.DataFrame()
-population_table["column_01"] = (np.random.rand(
-    500)*10.0).astype(np.int).astype(np.str)
-population_table["join_key"] = range(500)
-population_table["time_stamp_population"] = np.random.rand(500)
-
-peripheral_table = pd.DataFrame()
-peripheral_table["column_01"] = (np.random.rand(
-    125000)*10.0).astype(np.int).astype(np.str)
-peripheral_table["join_key"] = [
-    int(500.0 * np.random.rand(1)[0]) for i in range(125000)]
-peripheral_table["time_stamp_peripheral"] = np.random.rand(125000)
-
-# ----------------
-
-temp = peripheral_table.merge(
-    population_table[["join_key", "time_stamp_population"]],
-    how="left",
-    on="join_key"
-)
-
-# Apply some conditions
-temp = temp[
-    (temp["time_stamp_peripheral"] <= temp["time_stamp_population"]) &
-    (temp["column_01"] != "1") &
-    (temp["column_01"] != "2") &
-    (temp["column_01"] != "9")
-]
-
-# Define the aggregation
-temp = temp[["column_01", "join_key"]].groupby(
-    ["join_key"],
-    as_index=False
-).count()
-
-temp = temp.rename(index=str, columns={"column_01": "targets"})
-
-population_table = population_table.merge(
-    temp,
-    how="left",
-    on="join_key"
-)
-
-del temp
-
-# ----------------
-
-population_table = population_table.rename(
-    index=str, columns={"time_stamp_population": "time_stamp"})
-
-peripheral_table = peripheral_table.rename(
-    index=str, columns={"time_stamp_peripheral": "time_stamp"})
-
-# ----------------
-
-# Replace NaN targets with 0.0 - target values may never be NaN!.
-population_table["targets"] = [
-    0.0 if val != val else val for val in population_table["targets"]
-]
+population_table, peripheral_table = datasets.make_categorical()
 
 #----------------
 # Upload data to the getML engine
@@ -119,8 +59,7 @@ peripheral_on_engine = engine.DataFrame(
 )
 
 # The low-level API allows you to upload
-# data to the getML
-# engine in a piecewise fashion.
+# data to the Multirel engine in a piecewise fashion.
 # Here we load the first part of the pandas.DataFrame...
 peripheral_on_engine.send(
     peripheral_table[:2000]
@@ -139,7 +78,7 @@ population_on_engine = engine.DataFrame(
 )
 
 # The low-level API allows you to upload
-# data to the getML engine in a piecewise fashion.
+# data to the Multirel engine in a piecewise fashion.
 # Here we load the first part of the pandas.DataFrame...
 population_on_engine.send(
     population_table[:20]
