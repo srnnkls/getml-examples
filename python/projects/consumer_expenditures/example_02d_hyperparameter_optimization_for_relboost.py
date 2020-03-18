@@ -1,9 +1,11 @@
 import datetime
 import os
 
+import getml.data as data 
 import getml.engine as engine
 import getml.hyperopt as hyperopt
-import getml.loss_functions as loss_functions
+import getml.models.loss_functions as loss_functions
+import getml.data.placeholder as placeholder
 import getml.predictors as predictors
 import getml.models as models
 
@@ -20,32 +22,35 @@ engine.set_project("CE")
 # Reload the data - if you haven't shut down the engine since loading the data
 # in the first script, you can also call .refresh()
 
-df_population_training = engine.DataFrame("POPULATION_TRAINING").load()
+df_population_training = data.load_data_frame("POPULATION_TRAINING")
 
-df_population_validation = engine.DataFrame("POPULATION_VALIDATION").load()
+df_population_validation = data.load_data_frame("POPULATION_VALIDATION")
 
-df_population_testing = engine.DataFrame("POPULATION_TESTING").load()
+df_population_testing = data.load_data_frame("POPULATION_TESTING")
 
-df_peripheral = engine.DataFrame("PERIPHERAL").load()
+df_expd = data.load_data_frame("EXPD")
+
+df_memd = data.load_data_frame("MEMD")
 
 # -----------------------------------------------------------------------------
 # Build data model - in this case, the data model is quite simple an consists
 # of two self-joins
 
-CE_placeholder = models.Placeholder("PERIPHERAL")
+population_placeholder = placeholder.Placeholder("POPULATION")
 
-CE_placeholder2 = models.Placeholder("PERIPHERAL")
+expd_placeholder = placeholder.Placeholder("EXPD")
 
-CE_placeholder.join(
-    CE_placeholder2,
+memd_placeholder = placeholder.Placeholder("MEMD")
+
+population_placeholder.join(
+    expd_placeholder,
     join_key="NEWID",
-    time_stamp="TIME_STAMP",
-    other_time_stamp="TIME_STAMP_SHIFTED"
+    time_stamp="TIME_STAMP"
 )
 
-CE_placeholder.join(
-    CE_placeholder2,
-    join_key="BASKETID",
+population_placeholder.join(
+    memd_placeholder,
+    join_key="NEWID",
     time_stamp="TIME_STAMP"
 )
 
@@ -75,8 +80,8 @@ predictor = predictors.XGBoostClassifier(
 #predictor = predictors.LogisticRegression()
 
 model = models.RelboostModel(
-    population=CE_placeholder,
-    peripheral=[CE_placeholder],
+    population=population_placeholder,
+    peripheral=[expd_placeholder, memd_placeholder],
     loss_function=loss_functions.CrossEntropyLoss(),
     shrinkage=0.1,
     gamma=0.0,
@@ -87,7 +92,7 @@ model = models.RelboostModel(
     sampling_factor=1.0,
     predictor=predictor,
     feature_selector=feature_selector,
-    num_threads=6
+    num_threads=4
 ).send()
 
 # ----------------
@@ -98,7 +103,7 @@ param_space = dict()
 param_space['max_depth'] = [3, 10]
 param_space['min_num_samples'] = [100, 500]
 param_space['num_features'] = [20, 200]
-param_space['reg_lambda'] = [0.0001, 0.1]
+param_space['reg_lambda'] = [0.0, 0.001]
 param_space['share_selected_features'] = [0.1, 1.0]
 param_space['shrinkage'] = [0.01, 0.3]
 
@@ -114,7 +119,7 @@ latin_search = hyperopt.LatinHypercubeSearch(
 latin_search.fit(
   population_table_training=df_population_training,
   population_table_validation=df_population_validation,
-  peripheral_tables=[df_peripheral]
+  peripheral_tables=[df_expd, df_memd]
 )
 
 
