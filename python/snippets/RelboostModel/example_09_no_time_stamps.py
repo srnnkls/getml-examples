@@ -21,11 +21,12 @@
 import numpy as np
 import pandas as pd
 
-import getml.aggregations as aggregations
+import getml.models.aggregations as aggregations
 import getml.datasets as datasets
 import getml.engine as engine
-import getml.loss_functions as loss_functions
+import getml.models.loss_functions as loss_functions
 import getml.models as models
+import getml.data as data
 import getml.predictors as predictors
 
 # ----------------
@@ -45,49 +46,93 @@ engine.set_project("examples")
 # ) AND t2.time_stamp <= t1.time_stamp
 # GROUP BY t1.join_key,
 #          t1.time_stamp;
+#
 
-population_table, peripheral_table = datasets.make_same_units_numerical()
+n_rows_population = 500
+n_rows_peripheral = 125000
+aggregation = aggregations.Count
+
+random = np.random.RandomState(8290)
+
+population_table = pd.DataFrame()
+population_table["column_01"] = random.rand(n_rows_population) * 2.0 - 1.0
+population_table["join_key"] = np.arange(n_rows_population)
+population_table["time_stamp_population"] = random.rand(n_rows_population)
+
+peripheral_table = pd.DataFrame()
+peripheral_table["column_01"] = random.rand(n_rows_peripheral) * 2.0 - 1.0
+peripheral_table["join_key"] = random.randint(0, n_rows_population, n_rows_peripheral) 
+peripheral_table["time_stamp_peripheral"] = random.rand(n_rows_peripheral)
+
+# Compute targets
+temp = peripheral_table.merge(
+    population_table[["join_key", "time_stamp_population"]],
+    how="left",
+    on="join_key"
+)
+
+# Apply some conditions
+temp = temp[
+    (temp["column_01"] <= 0.5) 
+]
+
+# Define the aggregation
+temp = datasets._aggregate(temp, aggregation, "column_01", "join_key")
+
+temp = temp.rename(index=str, columns={"column_01": "targets"})
+
+population_table = population_table.merge(
+    temp,
+    how="left",
+    on="join_key"
+)
+
+del temp
+
+population_table = population_table.rename(
+    index=str, columns={"time_stamp_population": "time_stamp"})
+
+peripheral_table = peripheral_table.rename(
+    index=str, columns={"time_stamp_peripheral": "time_stamp"})
+
+# Replace NaN targets with 0.0 - target values may never be NaN!.
+population_table.targets = np.where(
+        np.isnan(population_table['targets']), 
+        0, 
+        population_table['targets'])
 
 # ----------------
 # Build model
 
-units = dict()
-
-units["column_01"] = "unit_01"
-
-population_placeholder = models.Placeholder(
+population_placeholder = data.Placeholder(
     name="POPULATION",
     numerical=["column_01"],
     join_keys=["join_key"],
-    time_stamps=["time_stamp"],
     targets=["targets"]
 )
 
-peripheral_placeholder = models.Placeholder(
+peripheral_placeholder = data.Placeholder(
     name="PERIPHERAL",
     numerical=["column_01"],
-    join_keys=["join_key"],
-    time_stamps=["time_stamp"]
+    join_keys=["join_key"]
 )
 
-population_placeholder.join(peripheral_placeholder, "join_key", "time_stamp")
+population_placeholder.join(peripheral_placeholder, "join_key")
 
 predictor = predictors.LinearRegression()
 
-model = models.MultirelModel(
-    aggregation=[
-        aggregations.Count,
-        aggregations.Sum
-    ],
+#predictor = predictors.XGBoostRegressor()
+
+model = models.RelboostModel(
     population=population_placeholder,
     peripheral=[peripheral_placeholder],
     loss_function=loss_functions.SquareLoss(),
     predictor=predictor,
     num_features=10,
-    share_aggregations=1.0,
-    max_length=1,
-    num_threads=0,
-    units=units # insert the unit
+    max_depth=1,
+    reg_lambda=0.0,
+    shrinkage=0.3,
+    num_threads=0
 ).send()
 
 # ----------------
@@ -113,7 +158,7 @@ yhat = model.predict(
 
 # ----------------
 
-print(model.to_sql())
+#print(model.to_sql())
 
 # ----------------
 
@@ -125,3 +170,5 @@ scores = model.score(
 print(scores)
 
 # ----------------
+
+engine.delete_project("examples")

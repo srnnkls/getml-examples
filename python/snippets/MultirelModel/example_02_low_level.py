@@ -21,11 +21,13 @@
 import numpy as np
 import pandas as pd
 
-import getml.aggregations as aggregations
+import getml.models.aggregations as aggregations
+import getml.data as data
 import getml.datasets as datasets
 import getml.engine as engine
-import getml.loss_functions as loss_functions
+import getml.models.loss_functions as loss_functions
 import getml.models as models
+import getml.data as data
 import getml.predictors as predictors
 
 # ----------------
@@ -46,59 +48,111 @@ engine.set_project("examples")
 # GROUP BY t1.join_key,
 #          t1.time_stamp;
 
-population_table, peripheral_table = datasets.make_numerical()
+n_rows_population = 500
+n_rows_peripheral = 125000
+aggregation = aggregations.Count
+
+random = np.random.RandomState(8290)
+
+population_table = pd.DataFrame()
+population_table["column_01"] = random.rand(n_rows_population) * 2.0 - 1.0
+population_table["join_key"] = np.arange(n_rows_population)
+population_table["time_stamp_population"] = random.rand(n_rows_population)
+
+peripheral_table = pd.DataFrame()
+peripheral_table["column_01"] = random.rand(n_rows_peripheral) * 2.0 - 1.0
+peripheral_table["join_key"] = random.randint(0, n_rows_population, n_rows_peripheral) 
+peripheral_table["time_stamp_peripheral"] = random.rand(n_rows_peripheral)
+
+# Compute targets
+temp = peripheral_table.merge(
+    population_table[["join_key", "time_stamp_population"]],
+    how="left",
+    on="join_key"
+)
+
+# Apply some conditions
+temp = temp[
+    (temp["time_stamp_peripheral"] <= temp["time_stamp_population"]) &
+    (temp["time_stamp_peripheral"] >= temp["time_stamp_population"] - 0.5)
+]
+
+# Define the aggregation
+temp = datasets._aggregate(temp, aggregation, "column_01", "join_key")
+
+temp = temp.rename(index=str, columns={"column_01": "targets"})
+
+population_table = population_table.merge(
+    temp,
+    how="left",
+    on="join_key"
+)
+
+del temp
+
+population_table = population_table.rename(
+    index=str, columns={"time_stamp_population": "time_stamp"})
+
+peripheral_table = peripheral_table.rename(
+    index=str, columns={"time_stamp_peripheral": "time_stamp"})
+
+# Replace NaN targets with 0.0 - target values may never be NaN!.
+population_table.targets = np.where(
+        np.isnan(population_table['targets']), 
+        0, 
+        population_table['targets'])
 
 # ----------------
 # Upload data to the getML engine
 
-peripheral_on_engine = engine.DataFrame(
-    name="PERIPHERAL",
-    join_keys=["join_key"],
-    numerical=["column_01"],
-    time_stamps=["time_stamp"]
-)
-
 # The low-level API allows you to upload
 # data to the getML engine in a piecewise fashion.
 # Here we load the first part of the pandas.DataFrame...
-peripheral_on_engine.send(
+peripheral_on_engine = data.DataFrame(
+    name="PERIPHERAL",
+    roles={
+        "join_key": ["join_key"],
+        "numerical": ["column_01"],
+        "time_stamp": ["time_stamp"]}
+).read_pandas(
     peripheral_table[:2000]
 )
 
 # ...and now we load the second part
-peripheral_on_engine.append(
-    peripheral_table[2000:]
-)
-
-population_on_engine = engine.DataFrame(
-    name="POPULATION",
-    join_keys=["join_key"],
-    numerical=["column_01"],
-    time_stamps=["time_stamp"],
-    targets=["targets"]
+peripheral_on_engine.read_pandas(
+    peripheral_table[2000:],
+    append=True
 )
 
 # The low-level API allows you to upload
 # data to the getML engine in a piecewise fashion.
 # Here we load the first part of the pandas.DataFrame...
-population_on_engine.send(
+population_on_engine = data.DataFrame(
+    name="POPULATION",
+    roles={
+        "join_key": ["join_key"],
+        "numerical": ["column_01"],
+        "time_stamp": ["time_stamp"],
+        "target": ["targets"]}
+).read_pandas(
     population_table[:20]
 )
 
 # ...and now we load the second part
-population_on_engine.append(
-   population_table[20:]
+population_on_engine.read_pandas(
+   population_table[20:],
+   append=True
 )
 
 # ----------------
 # Build model
 
-population_placeholder = models.Placeholder(
-    name="POPULATION"
+population_placeholder = data.Placeholder(
+    name="numerical_population"
 )
 
-peripheral_placeholder = models.Placeholder(
-    name="PERIPHERAL"
+peripheral_placeholder = data.Placeholder(
+    name="numerical_peripheral"
 )
 
 population_placeholder.join(peripheral_placeholder, "join_key", "time_stamp")
@@ -116,7 +170,7 @@ model = models.MultirelModel(
     predictor=predictor,
     num_features=10,
     share_aggregations=1.0,
-    max_length=1,
+    max_length=3,
     num_threads=0
 ).send()
 
@@ -133,6 +187,16 @@ features = model.transform(
     population_table=population_on_engine,
     peripheral_tables=[peripheral_on_engine]
 )
+
+# ----------------
+
+features = model.transform(
+    population_table=population_on_engine,
+    peripheral_tables=[peripheral_on_engine],
+    df_name="features"
+)
+
+print(features)
 
 # ----------------
 
@@ -156,3 +220,5 @@ scores = model.score(
 print(scores)
 
 # ----------------
+
+engine.delete_project("examples")

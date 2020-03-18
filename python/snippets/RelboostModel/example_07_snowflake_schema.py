@@ -21,11 +21,12 @@
 import numpy as np
 import pandas as pd
 
-import getml.aggregations as aggregations
+import getml.models.aggregations as aggregations
 import getml.datasets as datasets
 import getml.engine as engine
-import getml.loss_functions as loss_functions
+import getml.models.loss_functions as loss_functions
 import getml.models as models
+import getml.data as data
 import getml.predictors as predictors
 
 #----------------
@@ -43,30 +44,11 @@ population_table, peripheral_table, peripheral_table2 = datasets.make_snowflake(
 # ----------------
 # Build data model
 
-population_placeholder = models.Placeholder(
-    name="POPULATION",
-    numerical=["column_01"],
-    join_keys=["join_key"],
-    time_stamps=["time_stamp"],
-    targets=["targets"]
-)
-
-peripheral_placeholder = models.Placeholder(
-    name="PERIPHERAL",
-    numerical=["column_01"],
-    join_keys=["join_key", "join_key2"],
-    time_stamps=["time_stamp"]
-)
-
-peripheral2_placeholder = models.Placeholder(
-    name="PERIPHERAL2",
-    numerical=["column_01"],
-    join_keys=["join_key2"],
-    time_stamps=["time_stamp"]
-)
+population_placeholder = population_table.to_placeholder()
+peripheral_placeholder = peripheral_table.to_placeholder()
+peripheral2_placeholder = peripheral_table2.to_placeholder()
 
 peripheral_placeholder.join(peripheral2_placeholder, "join_key2", "time_stamp")
-
 population_placeholder.join(peripheral_placeholder, "join_key", "time_stamp")
 
 predictor = predictors.LinearRegression()
@@ -111,4 +93,9 @@ scores = model.score(
 )
 
 print(scores)
+
+# ----------------
+
+engine.delete_project("examples")
+
 

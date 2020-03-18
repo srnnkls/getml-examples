@@ -21,11 +21,12 @@
 import numpy as np
 import pandas as pd
 
-import getml.aggregations as aggregations
+import getml.models.aggregations as aggregations
 import getml.datasets as datasets
 import getml.engine as engine
-import getml.loss_functions as loss_functions
+import getml.models.loss_functions as loss_functions
 import getml.models as models
+import getml.data as data
 import getml.predictors as predictors
 
 # ----------------
@@ -48,24 +49,8 @@ engine.set_project("examples")
 
 population_table, peripheral_table = datasets.make_numerical()
 
-# ----------------
-# Build model
-
-population_placeholder = models.Placeholder(
-    name="POPULATION",
-    numerical=["column_01"],
-    join_keys=["join_key"],
-    time_stamps=["time_stamp"],
-    targets=["targets"]
-)
-
-peripheral_placeholder = models.Placeholder(
-    name="PERIPHERAL",
-    numerical=["column_01"],
-    join_keys=["join_key"],
-    time_stamps=["time_stamp"]
-)
-
+population_placeholder = population_table.to_placeholder()
+peripheral_placeholder = peripheral_table.to_placeholder()
 population_placeholder.join(peripheral_placeholder, "join_key", "time_stamp")
 
 predictor = predictors.LinearRegression()
@@ -98,6 +83,14 @@ features = model.transform(
 
 # ----------------
 
+features = model.transform(
+    population_table=population_table,
+    peripheral_tables=[peripheral_table],
+    df_name="features"
+)
+
+# ----------------
+
 yhat = model.predict(
     population_table=population_table,
     peripheral_tables=[peripheral_table]
@@ -117,3 +110,6 @@ scores = model.score(
 print(scores)
 
 # ----------------
+
+engine.delete_project("examples")
+

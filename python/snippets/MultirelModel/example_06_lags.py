@@ -21,10 +21,12 @@
 import numpy as np
 import pandas as pd
 
-import getml.aggregations as aggregations
+import getml.models.aggregations as aggregations
+import getml.data as data
 import getml.engine as engine
-import getml.loss_functions as loss_functions
+import getml.models.loss_functions as loss_functions
 import getml.models as models
+import getml.data as data
 import getml.predictors as predictors
 
 # ----------------
@@ -47,36 +49,34 @@ time_series["column_01"] = np.sin(np.pi*time_series["time_stamp"]/5.0) + time_se
 # ----------------
 # Upload data to the getML engine
 
-population_on_engine = engine.DataFrame(
+population_on_engine = data.DataFrame(
     name="POPULATION",
-    join_keys=["join_key"],
-    targets=["column_01"],
-    time_stamps=["time_stamp_lagged"]
-)
-
-population_on_engine.send(
+    roles={
+        "join_key": ["join_key"],
+        "target": ["column_01"],
+        "time_stamp": ["time_stamp_lagged"]}
+).read_pandas(
     time_series
 )
 
-peripheral_on_engine = engine.DataFrame(
+peripheral_on_engine = data.DataFrame(
     name="PERIPHERAL",
-    join_keys=["join_key"],
-    numerical=["column_01"],
-    time_stamps=["time_stamp"]
-)
-
-peripheral_on_engine.send(
+    roles={
+        "join_key": ["join_key"],
+        "numerical": ["column_01"],
+        "time_stamp": ["time_stamp"]}
+).read_pandas(
     time_series
 )
 
 # ----------------
 # Build model
 
-population_placeholder = models.Placeholder(
+population_placeholder = data.Placeholder(
     name="TIME_SERIES"
 )
 
-peripheral_placeholder = models.Placeholder(
+peripheral_placeholder = data.Placeholder(
     name="TIME_SERIES"
 )
 
@@ -98,10 +98,11 @@ model = models.MultirelModel(
     peripheral=[peripheral_placeholder],
     loss_function=loss_functions.SquareLoss(),
     predictor=predictor,
+    min_num_samples=1,
     num_features=10,
     share_aggregations=1.0,
-    max_length=1,
-    num_threads=0,
+    max_length=2,
+    num_threads=4,
     delta_t=1.0 # Define the time delta
 ).send()
 
@@ -140,3 +141,5 @@ scores = model.score(
 print(scores)
 
 # ----------------
+
+engine.delete_project("examples")

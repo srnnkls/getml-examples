@@ -21,11 +21,13 @@
 import numpy as np
 import pandas as pd
 
-import getml.aggregations as aggregations
+import getml.models.aggregations as aggregations
 import getml.datasets as datasets
 import getml.engine as engine
-import getml.loss_functions as loss_functions
+import getml.hyperopt as hyperopt
+import getml.models.loss_functions as loss_functions
 import getml.models as models
+import getml.data as data
 import getml.predictors as predictors
 
 # ----------------
@@ -41,109 +43,77 @@ engine.set_project("examples")
 # LEFT JOIN PERIPHERAL t2
 # ON t1.join_key = t2.join_key
 # WHERE (
-#    ( t1.column_01 = t2.column_01 )
+#    ( t1.time_stamp - t2.time_stamp <= 0.5 )
 # ) AND t2.time_stamp <= t1.time_stamp
 # GROUP BY t1.join_key,
 #          t1.time_stamp;
 
-population_table, peripheral_table = datasets.make_same_units_categorical()
+population_table, peripheral_table = datasets.make_numerical(n_rows_population=1000)
+population_table_validation, _ = datasets.make_numerical(n_rows_population=1000)
 
-# ----------------
-# Upload data to the getML engine
-
-units = dict()
-
-units["column_01"] = "unit_01"
-
-peripheral_on_engine = engine.DataFrame(
-    name="PERIPHERAL",
-    join_keys=["join_key"],
-    categorical=["column_01"],
-    numerical=["column_02"],
-    time_stamps=["time_stamp"],
-    units=units # You can set the units here...
-)
-
-peripheral_on_engine.send(
-    peripheral_table
-)
-
-population_on_engine = engine.DataFrame(
-    name="POPULATION",
-    join_keys=["join_key"],
-    categorical=["column_01"],
-    time_stamps=["time_stamp"],
-    targets=["targets"],
-    units=units # You can set the units here...
-)
-
-population_on_engine.send(
-    population_table
-)
-
-# ... or you can declare them after loading the data.
-population_on_engine.categorical("column_01").set_unit("unit_01")
-peripheral_on_engine.categorical("column_01").set_unit("unit_01")
-
-# ----------------
-# Build model
-
-population_placeholder = models.Placeholder(
-    name="POPULATION"
-)
-
-peripheral_placeholder = models.Placeholder(
-    name="PERIPHERAL"
-)
-
+population_placeholder = population_table.to_placeholder()
+peripheral_placeholder = peripheral_table.to_placeholder()
 population_placeholder.join(peripheral_placeholder, "join_key", "time_stamp")
 
 predictor = predictors.LinearRegression()
 
-model = models.RelboostModel(
+model = models.MultirelModel(
+    aggregation=[
+        aggregations.Count,
+        aggregations.Sum
+    ],
     population=population_placeholder,
     peripheral=[peripheral_placeholder],
     loss_function=loss_functions.SquareLoss(),
     predictor=predictor,
     num_features=10,
-    max_depth=1,
-    reg_lambda=0.0,
-    shrinkage=0.3,
+    share_aggregations=1.0,
+    max_length=1,
     num_threads=0
 ).send()
 
 # ----------------
+# Build a hyperparameter space 
 
-model = model.fit(
-    population_table=population_on_engine,
-    peripheral_tables=[peripheral_on_engine]
+param_space = dict()
+
+param_space['grid_factor'] = [1.0, 16.0]
+param_space['min_num_samples'] = [100, 500]
+param_space['num_features'] = [2, 10]
+param_space['shrinkage'] = [0.0, 0.3]
+
+# Any hyperparameters that relate to the predictor
+# are preceded by "predictor_".
+param_space['predictor_lambda'] = [0.0, 0.00001]
+
+# ----------------
+# Wrap a RandomSearch around the reference model
+
+random_search = hyperopt.RandomSearch(
+    model=model,
+    param_space=param_space,
+    n_iter=10
+)
+
+random_search.fit(
+  population_table_training=population_table,
+  population_table_validation=population_table_validation,
+  peripheral_tables=[peripheral_table]
 )
 
 # ----------------
+# Wrap a LatinHypercubeSearch around the reference model
 
-features = model.transform(
-    population_table=population_on_engine,
-    peripheral_tables=[peripheral_on_engine]
+latin_search = hyperopt.LatinHypercubeSearch(
+    model=model,
+    param_space=param_space,
+    n_iter=10
 )
 
-# ----------------
-
-yhat = model.predict(
-    population_table=population_on_engine,
-    peripheral_tables=[peripheral_on_engine]
+latin_search.fit(
+  population_table_training=population_table,
+  population_table_validation=population_table_validation,
+  peripheral_tables=[peripheral_table]
 )
 
-# ----------------
-
-print(model.to_sql())
-
-# ----------------
-
-scores = model.score(
-    population_table=population_table,
-    peripheral_tables=[peripheral_table]
-)
-
-print(scores)
-
-# ----------------
+engine.delete_project("examples")

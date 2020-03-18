@@ -24,11 +24,12 @@ import urllib
 import numpy as np
 import pandas as pd
 
-import getml.aggregations as aggregations
+import getml.models.aggregations as aggregations
 import getml.datasets as datasets
 import getml.engine as engine
-import getml.loss_functions as loss_functions
+import getml.models.loss_functions as loss_functions
 import getml.models as models
+import getml.data as data
 import getml.predictors as predictors
 
 # ----------------
@@ -51,59 +52,8 @@ engine.set_project("examples")
 
 population_table, peripheral_table = datasets.make_numerical()
 
-# ----------------
-# Upload data to the getML engine
-
-peripheral_on_engine = engine.DataFrame(
-    name="PERIPHERAL",
-    join_keys=["join_key"],
-    numerical=["column_01"],
-    time_stamps=["time_stamp"]
-)
-
-# The low-level API allows you to upload
-# data to the getML engine in a piecewise fashion.
-# Here we load the first part of the pandas.DataFrame...
-peripheral_on_engine.send(
-    peripheral_table[:2000]
-)
-
-# ...and now we load the second part
-peripheral_on_engine.append(
-    peripheral_table[2000:]
-)
-
-population_on_engine = engine.DataFrame(
-    name="POPULATION",
-    join_keys=["join_key"],
-    numerical=["column_01"],
-    time_stamps=["time_stamp"],
-    targets=["targets"]
-)
-
-# The low-level API allows you to upload
-# data to the getML engine in a piecewise fashion.
-# Here we load the first part of the pandas.DataFrame...
-population_on_engine.send(
-    population_table[:20]
-)
-
-# ...and now we load the second part
-population_on_engine.append(
-   population_table[20:]
-)
-
-# ----------------
-# Build model
-
-population_placeholder = models.Placeholder(
-    name="POPULATION"
-)
-
-peripheral_placeholder = models.Placeholder(
-    name="PERIPHERAL"
-)
-
+population_placeholder = population_table.to_placeholder()
+peripheral_placeholder = peripheral_table.to_placeholder()
 population_placeholder.join(peripheral_placeholder, "join_key", "time_stamp")
 
 predictor = predictors.LinearRegression()
@@ -128,23 +78,23 @@ model = models.MultirelModel(
 # ----------------
 
 model = model.fit(
-    population_table=population_on_engine,
-    peripheral_tables=[peripheral_on_engine]
+    population_table=population_table,
+    peripheral_tables=[peripheral_table]
 )
 
 # ----------------
 
 model.transform(
-    population_table=population_on_engine,
-    peripheral_tables=[peripheral_on_engine],
+    population_table=population_table,
+    peripheral_tables=[peripheral_table],
     table_name="MyModel_Features"
 )
 
 # ----------------
 
 model.predict(
-    population_table=population_on_engine,
-    peripheral_tables=[peripheral_on_engine],
+    population_table=population_table,
+    peripheral_tables=[peripheral_table],
     table_name="MyModel_Predictions"
 )
 
@@ -162,3 +112,6 @@ scores = model.score(
 
 print(scores)
 
+# ----------------
+
+engine.delete_project("examples")

@@ -19,16 +19,20 @@
 # DEALINGS IN THE SOFTWARE.
 
 import json
-import urllib
+from urllib import (
+    error,
+    request
+)
 
 import numpy as np
 import pandas as pd
 
-import getml.aggregations as aggregations
+import getml.models.aggregations as aggregations
 import getml.datasets as datasets
 import getml.engine as engine
-import getml.loss_functions as loss_functions
+import getml.models.loss_functions as loss_functions
 import getml.models as models
+import getml.data as data
 import getml.predictors as predictors
 
 # ----------------
@@ -51,59 +55,8 @@ engine.set_project("examples")
 
 population_table, peripheral_table = datasets.make_numerical()
 
-# ----------------
-# Upload data to the getML engine
-
-peripheral_on_engine = engine.DataFrame(
-    name="PERIPHERAL",
-    join_keys=["join_key"],
-    numerical=["column_01"],
-    time_stamps=["time_stamp"]
-)
-
-# The low-level API allows you to upload
-# data to the getML engine in a piecewise fashion.
-# Here we load the first part of the pandas.DataFrame...
-peripheral_on_engine.send(
-    peripheral_table[:2000]
-)
-
-# ...and now we load the second part
-peripheral_on_engine.append(
-    peripheral_table[2000:]
-)
-
-population_on_engine = engine.DataFrame(
-    name="POPULATION",
-    join_keys=["join_key"],
-    numerical=["column_01"],
-    time_stamps=["time_stamp"],
-    targets=["targets"]
-)
-
-# The low-level API allows you to upload
-# data to the getML engine in a piecewise fashion.
-# Here we load the first part of the pandas.DataFrame...
-population_on_engine.send(
-    population_table[:20]
-)
-
-# ...and now we load the second part
-population_on_engine.append(
-   population_table[20:]
-)
-
-# ----------------
-# Build model
-
-population_placeholder = models.Placeholder(
-    name="POPULATION"
-)
-
-peripheral_placeholder = models.Placeholder(
-    name="PERIPHERAL"
-)
-
+population_placeholder = population_table.to_placeholder()
+peripheral_placeholder = peripheral_table.to_placeholder()
 population_placeholder.join(peripheral_placeholder, "join_key", "time_stamp")
 
 predictor = predictors.LinearRegression()
@@ -127,22 +80,22 @@ model = models.MultirelModel(
 # ----------------
 
 model = model.fit(
-    population_table=population_on_engine,
-    peripheral_tables=[peripheral_on_engine]
+    population_table=population_table,
+    peripheral_tables=[peripheral_table]
 )
 
 # ----------------
 
 features = model.transform(
-    population_table=population_on_engine,
-    peripheral_tables=[peripheral_on_engine]
+    population_table=population_table,
+    peripheral_tables=[peripheral_table]
 )
 
 # ----------------
 
 yhat = model.predict(
-    population_table=population_on_engine,
-    peripheral_tables=[peripheral_on_engine]
+    population_table=population_table,
+    peripheral_tables=[peripheral_table]
 )
 
 # ----------------
@@ -158,6 +111,12 @@ scores = model.score(
 )
 
 print(scores)
+
+# ----------------
+# Before you can send HTTP requests to the model,
+# you need to activate that.
+
+model.deploy(True)
 
 # ----------------
 # In order to make the model generate predictions,
@@ -178,10 +137,14 @@ data = """{
 
 url = "http://localhost:1709/predict/MyModel/"
 
-response = urllib.request.urlopen(
-  url=url, 
-  data=data.encode()
-).read()
+try:
+    response = request.urlopen(
+      url=url, 
+      data=data.encode()
+    ).read()
+except error.HTTPError as e:
+    error_message = e.read()
+    raise Exception(error_message)
 
 print(response)
 
@@ -190,10 +153,14 @@ print(response)
 
 url = "http://localhost:1709/transform/MyModel/"
 
-response = urllib.request.urlopen(
-  url=url, 
-  data=data.encode()
-).read()
+try:
+    response = request.urlopen(
+      url=url, 
+      data=data.encode()
+    ).read()
+except error.HTTPError as e:
+    error_message = e.read()
+    raise Exception(error_message)
 
 print(response)
 
@@ -216,10 +183,14 @@ data2 = """{
 
 url = "http://localhost:1709/predict/MyModel/"
 
-response = urllib.request.urlopen(
-  url=url, 
-  data=data2.encode()
-).read()
+try:
+    response = request.urlopen(
+      url=url, 
+      data=data.encode()
+    ).read()
+except error.HTTPError as e:
+    error_message = e.read()
+    raise Exception(error_message)
 
 print(response)
 
@@ -239,17 +210,21 @@ data3 = """{
 
 url = "http://localhost:1709/predict/MyModel/"
 
-response = urllib.request.urlopen(
-  url=url, 
-  data=data3.encode()
-).read()
+try:
+    response = request.urlopen(
+      url=url, 
+      data=data.encode()
+    ).read()
+except error.HTTPError as e:
+    error_message = e.read()
+    raise Exception(error_message)
 
 print(response)
 
 # ---------------
 # Selecting data from the data base.
 
-peripheral_on_engine.to_db("PERIPHERAL")
+peripheral_table.to_db("PERIPHERAL")
 
 # A problem with SQL queries is that they often contain a
 # quotation mark, which can create  conflicts with the JSON syntax. 
@@ -270,9 +245,18 @@ data4_json = json.dumps(data4)
 	
 url = "http://localhost:1709/predict/MyModel/"
 
-response = urllib.request.urlopen(
-  url=url, 
-  data=data4_json.encode()
-).read()
+try:
+    response = request.urlopen(
+      url=url, 
+      data=data.encode()
+    ).read()
+except error.HTTPError as e:
+    error_message = e.read()
+    raise Exception(error_message)
 
 print(response)
+
+# ----------------
+
+engine.delete_project("examples")
+

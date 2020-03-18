@@ -38,36 +38,104 @@ engine.set_project("examples")
 # The problem we create looks like this:
 #
 # SELECT COUNT( * )
-# FROM POPULATION_TABLE t1
-# LEFT JOIN PERIPHERAL_TABLE t2
+# FROM POPULATION t1
+# LEFT JOIN PERIPHERAL t2
 # ON t1.join_key = t2.join_key
 # WHERE (
-#    ( t2.column_01 != '1' AND t2.column_01 != '2' AND t2.column_01 != '9' )
-# ) AND t2.time_stamps <= t1.time_stamps
-# GROUP BY t2.join_key;
+#    ( t1.time_stamp - t2.time_stamp <= 0.5 )
+# ) AND t2.time_stamp <= t1.time_stamp
+# GROUP BY t1.join_key,
+#          t1.time_stamp;
 #
-# Don't worry - you don't really have to understand this part.
-# This is just how we generate the example dataset. To learn more
-# about getML just skip to "Build model".
 
-population_table, peripheral_table = datasets.make_categorical()
+n_rows_population = 500
+n_rows_peripheral = 125000
+aggregation = aggregations.Count
 
-population_placeholder = population_table.to_placeholder()
-peripheral_placeholder = peripheral_table.to_placeholder()
-population_placeholder.join(peripheral_placeholder, "join_key", "time_stamp")
+random = np.random.RandomState(8290)
+
+population_table = pd.DataFrame()
+population_table["column_01"] = random.rand(n_rows_population) * 2.0 - 1.0
+population_table["join_key"] = np.arange(n_rows_population)
+population_table["time_stamp_population"] = random.rand(n_rows_population)
+
+peripheral_table = pd.DataFrame()
+peripheral_table["column_01"] = random.rand(n_rows_peripheral) * 2.0 - 1.0
+peripheral_table["join_key"] = random.randint(0, n_rows_population, n_rows_peripheral) 
+peripheral_table["time_stamp_peripheral"] = random.rand(n_rows_peripheral)
+
+# Compute targets
+temp = peripheral_table.merge(
+    population_table[["join_key", "time_stamp_population"]],
+    how="left",
+    on="join_key"
+)
+
+# Apply some conditions
+temp = temp[
+    (temp["column_01"] <= 0.5) 
+]
+
+# Define the aggregation
+temp = datasets._aggregate(temp, aggregation, "column_01", "join_key")
+
+temp = temp.rename(index=str, columns={"column_01": "targets"})
+
+population_table = population_table.merge(
+    temp,
+    how="left",
+    on="join_key"
+)
+
+del temp
+
+population_table = population_table.rename(
+    index=str, columns={"time_stamp_population": "time_stamp"})
+
+peripheral_table = peripheral_table.rename(
+    index=str, columns={"time_stamp_peripheral": "time_stamp"})
+
+# Replace NaN targets with 0.0 - target values may never be NaN!.
+population_table.targets = np.where(
+        np.isnan(population_table['targets']), 
+        0, 
+        population_table['targets'])
+
+# ----------------
+# Build model
+
+population_placeholder = data.Placeholder(
+    name="POPULATION",
+    numerical=["column_01"],
+    join_keys=["join_key"],
+    targets=["targets"]
+)
+
+peripheral_placeholder = data.Placeholder(
+    name="PERIPHERAL",
+    numerical=["column_01"],
+    join_keys=["join_key"]
+)
+
+population_placeholder.join(peripheral_placeholder, "join_key")
 
 predictor = predictors.LinearRegression()
 
-model = models.RelboostModel(
+#predictor = predictors.XGBoostRegressor()
+
+model = models.MultirelModel(
+    aggregation=[
+        aggregations.Count,
+        aggregations.Sum
+    ],
     population=population_placeholder,
     peripheral=[peripheral_placeholder],
     loss_function=loss_functions.SquareLoss(),
     predictor=predictor,
     num_features=10,
-    max_depth=1,
-    reg_lambda=0.0,
-    shrinkage=0.3,
-    num_threads=1
+    share_aggregations=1.0,
+    max_length=3,
+    num_threads=0
 ).send()
 
 # ----------------
@@ -93,10 +161,9 @@ yhat = model.predict(
 
 # ----------------
 
-print(model.to_sql())
+#print(model.to_sql())
 
 # ----------------
-# By the way, passing pandas.DataFrames still works.
 
 scores = model.score(
     population_table=population_table,

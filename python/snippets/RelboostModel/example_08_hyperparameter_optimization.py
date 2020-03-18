@@ -21,12 +21,13 @@
 import numpy as np
 import pandas as pd
 
-import getml.aggregations as aggregations
+import getml.models.aggregations as aggregations
 import getml.datasets as datasets
 import getml.engine as engine
 import getml.hyperopt as hyperopt
-import getml.loss_functions as loss_functions
+import getml.models.loss_functions as loss_functions
 import getml.models as models
+import getml.data as data
 import getml.predictors as predictors
 
 # ----------------
@@ -48,72 +49,23 @@ engine.set_project("examples")
 #          t1.time_stamp;
 
 population_table, peripheral_table = datasets.make_numerical(n_rows_population=1000)
+population_table_validation, _ = datasets.make_numerical(n_rows_population=1000)
 
-# ----------------
-# Upload data to the getML engine
-
-peripheral_on_engine = engine.DataFrame(
-    name="PERIPHERAL",
-    join_keys=["join_key"],
-    numerical=["column_01"],
-    time_stamps=["time_stamp"]
-)
-
-peripheral_on_engine.send(
-    peripheral_table
-)
-
-population_on_engine_training = engine.DataFrame(
-    name="POPULATION_TRAINING",
-    join_keys=["join_key"],
-    numerical=["column_01"],
-    time_stamps=["time_stamp"],
-    targets=["targets"]
-)
-
-population_on_engine_training.send(
-    population_table[:500]
-)
-
-population_on_engine_validation = engine.DataFrame(
-    name="POPULATION_VALIDATION",
-    join_keys=["join_key"],
-    numerical=["column_01"],
-    time_stamps=["time_stamp"],
-    targets=["targets"]
-)
-
-population_on_engine_validation.send(
-    population_table[500:]
-)
-
-# ----------------
-# Build a reference model
-
-population_placeholder = models.Placeholder(
-    name="POPULATION"
-)
-
-peripheral_placeholder = models.Placeholder(
-    name="PERIPHERAL"
-)
-
+population_placeholder = population_table.to_placeholder()
+peripheral_placeholder = peripheral_table.to_placeholder()
 population_placeholder.join(peripheral_placeholder, "join_key", "time_stamp")
 
 predictor = predictors.LinearRegression()
 
-model = models.MultirelModel(
-    aggregation=[
-        aggregations.Count,
-        aggregations.Sum
-    ],
+model = models.RelboostModel(
     population=population_placeholder,
     peripheral=[peripheral_placeholder],
     loss_function=loss_functions.SquareLoss(),
     predictor=predictor,
     num_features=10,
-    share_aggregations=1.0,
-    max_length=1,
+    max_depth=1,
+    reg_lambda=0.0,
+    shrinkage=0.3,
     num_threads=0
 ).send()
 
@@ -122,14 +74,15 @@ model = models.MultirelModel(
 
 param_space = dict()
 
-param_space['grid_factor'] = [1.0, 16.0]
+param_space['max_depth'] = [3, 10]
 param_space['min_num_samples'] = [100, 500]
-param_space['num_features'] = [2, 10]
-param_space['shrinkage'] = [0.0, 0.3]
+param_space['num_features'] = [10, 20]
+param_space['reg_lambda'] = [0.0, 0.1]
+param_space['shrinkage'] = [0.01, 0.3]
 
 # Any hyperparameters that relate to the predictor
-# are preceded by "predictor__".
-param_space['predictor__lambda'] = [0.0, 0.00001]
+# are preceded by "predictor_".
+param_space['predictor_lambda'] = [0.0, 0.00001]
 
 # ----------------
 # Wrap a RandomSearch around the reference model
@@ -141,9 +94,9 @@ random_search = hyperopt.RandomSearch(
 )
 
 random_search.fit(
-  population_table_training=population_on_engine_training,
-  population_table_validation=population_on_engine_validation,
-  peripheral_tables=[peripheral_on_engine]
+  population_table_training=population_table,
+  population_table_validation=population_table_validation,
+  peripheral_tables=[peripheral_table]
 )
 
 # ----------------
@@ -156,7 +109,12 @@ latin_search = hyperopt.LatinHypercubeSearch(
 )
 
 latin_search.fit(
-  population_table_training=population_on_engine_training,
-  population_table_validation=population_on_engine_validation,
-  peripheral_tables=[peripheral_on_engine]
+  population_table_training=population_table,
+  population_table_validation=population_table_validation,
+  peripheral_tables=[peripheral_table]
 )
+
+# ----------------
+
+engine.delete_project("examples")
+

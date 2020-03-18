@@ -18,6 +18,7 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
+import getml.data as data
 import getml.engine as engine
 
 # ----------------
@@ -44,29 +45,27 @@ json_str2 = """{
 
 # ----------------
 
-my_df1 = engine.DataFrame(
+my_df1 = data.DataFrame(
     "MY DF 1",
-    categorical=["names"],
-    join_keys=["join_key"],
-    numerical=["column_01"],
-    time_stamps=["time_stamp"]
-)
-
-my_df1.from_json(
+    roles={
+        "categorical": ["names"],
+        "join_key": ["join_key"],
+        "numerical": ["column_01"],
+        "time_stamp": ["time_stamp"]}
+).read_json(
     json_str1
 )
 
 # ----------------
 
-my_df2 = engine.DataFrame(
+my_df2 = data.DataFrame(
     "MY DF 2",
-    categorical=["names"],
-    join_keys=["join_key"],
-    numerical=["column_01"],
-    time_stamps=["time_stamp"]
-)
-
-my_df2.from_json(
+    roles={
+        "categorical": ["names"],
+        "join_key": ["join_key"],
+        "numerical": ["column_01"],
+        "time_stamp": ["time_stamp"]}
+).read_json(
     json_str2
 )
 
@@ -77,13 +76,13 @@ joined_df1 = my_df1.join(
     other=my_df2,
     join_key="join_key",
     cols=[
-        my_df1.numerical("column_01"),
-        my_df1.join_key("join_key"),
-        my_df1.time_stamp("time_stamp").alias("time_stamp1")
+        my_df1["column_01"],
+        my_df1["join_key"],
+        my_df1["time_stamp"].alias("time_stamp1")
     ],
     other_cols=[
-        my_df2.numerical("column_01").alias("column_02"),
-        my_df2.time_stamp("time_stamp").alias("time_stamp2")
+        my_df2["column_01"].alias("column_02"),
+        my_df2["time_stamp"].alias("time_stamp2")
     ],
     how="left"
 )
@@ -96,19 +95,19 @@ joined_df2 = my_df1.join(
     other=my_df2,
     join_key="join_key",
     cols=[
-        my_df1.numerical("column_01"),
-        my_df1.join_key("join_key"),
-        my_df1.time_stamp("time_stamp").alias("time_stamp1")
+        my_df1["column_01"],
+        my_df1["join_key"],
+        my_df1["time_stamp"].alias("time_stamp1")
     ],
     other_cols=[
-        my_df2.numerical("column_01").alias("column_02"),
-        my_df2.time_stamp("time_stamp").alias("time_stamp2")
+        my_df2["column_01"].alias("column_02"),
+        my_df2["time_stamp"].alias("time_stamp2")
     ],
     how="left"
 )
 
-col1 = joined_df2.numerical("column_01")
-col2 = joined_df2.numerical("column_02")
+col1 = joined_df2["column_01"]
+col2 = joined_df2["column_02"]
 
 joined_df2 = joined_df2.where(
   "JOINED DF2",
@@ -118,21 +117,21 @@ joined_df2 = joined_df2.where(
 # ----------------
 # ...but this is more memory-efficient.
 
-col1 = my_df1.numerical("column_01")
-col2 = my_df2.numerical("column_01")
+col1 = my_df1["column_01"]
+col2 = my_df2["column_01"]
 
 joined_df3 = my_df1.join(
     name="JOINED DF3",
     other=my_df2,
     join_key="join_key",
     cols=[
-        my_df1.numerical("column_01"),
-        my_df1.join_key("join_key"),
-        my_df1.time_stamp("time_stamp").alias("time_stamp1")
+        my_df1["column_01"],
+        my_df1["join_key"],
+        my_df1["time_stamp"].alias("time_stamp1")
     ],
     other_cols=[
-        my_df2.numerical("column_01").alias("column_02"),
-        my_df2.time_stamp("time_stamp").alias("time_stamp2")
+        my_df2["column_01"].alias("column_02"),
+        my_df2["time_stamp"].alias("time_stamp2")
     ],
     how="left",
     where=(col1 == col2)
@@ -148,22 +147,21 @@ json_str = """{
 
 # ----------------
 
-my_df3 = engine.DataFrame(
+my_df3 = data.DataFrame(
     "MY DF3",
-    categorical=["names"],
-    join_keys=["join_key"],
-    numerical=["column_01"]
-)
-
-my_df3.from_json(
+    roles={
+        "categorical": ["names"],
+        "join_key": ["join_key"],
+        "numerical": ["column_01"]}
+).read_json(
     json_str
 )
 
 # ----------------
 
-col1 = my_df3.numerical("column_01")
+col1 = my_df3["column_01"]
 
-names = my_df3.categorical("names")
+names = my_df3["names"]
 
 # Note that NULL is never aggregated
 grouped_df = my_df3.group_by(
@@ -171,7 +169,7 @@ grouped_df = my_df3.group_by(
     "GROUPED DF",
     [col1.avg(alias="column_01_avg"),
      col1.count(alias="column_01_count"),
-     col1.max(alias="column_01_max"),
+     (col1 + 3.0).max(alias="column_01_plus_3_max"),
      col1.median(alias="column_01_median"),
      col1.min(alias="column_01_min"),
      col1.stddev(alias="column_01_stddev"),
@@ -188,3 +186,13 @@ my_df3.to_db("MYDF3")
 grouped_df.to_db("GROUPEDDF")
 
 # ----------------
+
+col1 = my_df1["column_01"]
+
+count_greater_than_two = (col1 > 2.0).as_num().sum().get()
+
+print(count_greater_than_two)
+
+# ----------------
+
+engine.delete_project("examples")

@@ -21,12 +21,14 @@
 import numpy as np
 import pandas as pd
 
-import getml.aggregations as aggregations
+import getml.models.aggregations as aggregations
 import getml.datasets as datasets
-import getml.engine as engine
-import getml.loss_functions as loss_functions
+import getml.engine as engine 
+import getml.models.loss_functions as loss_functions
 import getml.models as models
+import getml.data as data
 import getml.predictors as predictors
+import getml.data.roles as roles
 
 # ----------------
 
@@ -46,45 +48,40 @@ engine.set_project("examples")
 # GROUP BY t1.join_key,
 #          t1.time_stamp;
 
-population_table, peripheral_table = datasets.make_same_units_numerical()
+population_table, peripheral_table = datasets.make_numerical()
 
 # ----------------
-# Build model
+# For demonstration purposes, we add another target
 
-units = dict()
+targets2 = population_table["targets"] * 2.0
 
-units["column_01"] = "unit_01"
+population_table.add(targets2, "targets2", roles.target)
 
-population_placeholder = models.Placeholder(
-    name="POPULATION",
-    numerical=["column_01"],
-    join_keys=["join_key"],
-    time_stamps=["time_stamp"],
-    targets=["targets"]
-)
+# ----------------
+# Construct placeholders
 
-peripheral_placeholder = models.Placeholder(
-    name="PERIPHERAL",
-    numerical=["column_01"],
-    join_keys=["join_key"],
-    time_stamps=["time_stamp"]
-)
-
+population_placeholder = population_table.to_placeholder()
+peripheral_placeholder = peripheral_table.to_placeholder()
 population_placeholder.join(peripheral_placeholder, "join_key", "time_stamp")
 
 predictor = predictors.LinearRegression()
 
-model = models.RelboostModel(
+# ----------------
+# MultirelModel can simultaneously optimize its features for several targets...
+
+model = models.MultirelModel(
+    aggregation=[
+        aggregations.Count,
+        aggregations.Sum
+    ],
     population=population_placeholder,
     peripheral=[peripheral_placeholder],
     loss_function=loss_functions.SquareLoss(),
     predictor=predictor,
     num_features=10,
-    max_depth=1,
-    reg_lambda=0.0,
-    shrinkage=0.3,
-    num_threads=0,
-    units=units # Insert the units
+    share_aggregations=1.0,
+    max_length=1,
+    num_threads=0
 ).send()
 
 # ----------------
@@ -122,3 +119,59 @@ scores = model.score(
 print(scores)
 
 # ----------------
+# ...but RelboostModel is different. It needs to train
+# different features for every target.
+# This is because the weights need to be optimized
+# separately.
+
+for target_num in range(population_table.n_targets):
+    model = models.RelboostModel(
+        population=population_placeholder,
+        peripheral=[peripheral_placeholder],
+        loss_function=loss_functions.SquareLoss(),
+        predictor=predictor,
+        num_features=10,
+        max_depth=1,
+        reg_lambda=0.0,
+        shrinkage=0.3,
+        target_num=target_num, # Setting the target_num
+        num_threads=0
+    ).send()
+
+    # ----------------
+
+    model = model.fit(
+        population_table=population_table,
+        peripheral_tables=[peripheral_table]
+    )
+
+    # ----------------
+
+    features = model.transform(
+        population_table=population_table,
+        peripheral_tables=[peripheral_table]
+    )
+
+    # ----------------
+
+    yhat = model.predict(
+        population_table=population_table,
+        peripheral_tables=[peripheral_table]
+    )
+
+    # ----------------
+
+    print(model.to_sql())
+
+    # ----------------
+
+    scores = model.score(
+        population_table=population_table,
+        peripheral_tables=[peripheral_table]
+    )
+
+    print(scores)
+
+    # ----------------
+
+engine.delete_project("examples")
