@@ -21,11 +21,11 @@ You are actively encouraged to try them out, **reproduce our results** and
 **use them as a blueprint for your own projects**:
 
 * [Getting started](https://github.com/getml/getml-examples/blob/master/python/projects/getting_started/getting_started.ipynb)
-  - this notebook runs you through the most basic steps of relational learning using getML. 
+  - this notebook runs you through the most **basic steps of relational learning** using getML. 
     It is based on an artificial dataset. 
 
 * [Loans](https://github.com/getml/getml-examples/blob/master/python/projects/loans/loans.ipynb)
-  - the loans data set is one of the most commonly used data sets in the relational learning literature.
+  - the loans data set is one of the **most commonly used data sets in the relational learning literature**.
     Using getML's MultirelModel, we show how you can outperform practically all peer-reviewed academic papers 
     based on the loans data set.
 
@@ -34,6 +34,6 @@ You are actively encouraged to try them out, **reproduce our results** and
     relational learning can be successfully applied to time series.
 
 * [Consumer expenditures](https://github.com/getml/getml-examples/blob/master/python/projects/consumer_expenditures/consumer_expenditures.ipynb)
-  - the consumer expenditures data set is about analyzing consumer's consumption patterns to predict whether an item was purchased
+  - the consumer expenditures data set is about **analyzing consumer's consumption patterns** to predict whether an item was purchased
     as a gift. Using getML's relational boosting algorithm, we can reach an out-of-sample AUC of over 90%.
 
