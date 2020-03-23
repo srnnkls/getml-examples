@@ -29,6 +29,10 @@ You are actively encouraged to try them out, **reproduce our results** and
     Using getML's MultirelModel, we show how you can outperform practically all peer-reviewed academic papers 
     based on the loans data set.
 
+* [Occupancy detection](https://github.com/getml/getml-examples/blob/master/python/projects/occupancy_detection/occupancy_detection.ipynb)
+  - the occupancy detection data set is a **very simple multivariate time series**. This is to demonstrate how
+    relational learning can be successfully applied to time series.
+
 * [Consumer expenditures](https://github.com/getml/getml-examples/blob/master/python/projects/consumer_expenditures/consumer_expenditures.ipynb)
   - the consumer expenditures data set is about analyzing consumer's consumption patterns to predict whether an item was purchased
     as a gift. Using getML's relational boosting algorithm, we can reach an out-of-sample AUC of over 90%.
