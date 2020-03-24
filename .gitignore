@@ -112,3 +112,7 @@ venv.bak/
 
 # MacOS stuff
 *DS_Store
+
+
+# Data Files
+python/projects/occupancy_detection/*.txt
